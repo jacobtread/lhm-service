@@ -1,0 +1,286 @@
+//! # Windows Service
+//!
+//! Windows specific behavior for running OGuard as a Windows service, enables
+//! the required behavior for listening to shutdown events from the service manager,
+//! reporting the service state.
+//!
+//! Also includes logic for managing the service (Adding, Removing, and Restarting the service)
+
+use anyhow::Context;
+use interprocess::os::windows::named_pipe::{
+    DuplexPipeStream, PipeListener, PipeListenerOptions, PipeStream, pipe_mode,
+};
+use interprocess::os::windows::security_descriptor::SecurityDescriptor;
+use recvmsg::{MsgBuf, RecvMsg};
+use serde::{Deserialize, Serialize};
+use std::env;
+use std::ffi::OsString;
+use std::sync::{Arc, mpsc};
+use std::time::Duration;
+use tracing::debug;
+use widestring::{U16CStr, U16CString};
+use windows_service::service::{
+    ServiceAccess, ServiceControl, ServiceControlAccept, ServiceErrorControl, ServiceExitCode,
+    ServiceInfo, ServiceStartType, ServiceState, ServiceStatus, ServiceType,
+};
+use windows_service::service_control_handler;
+use windows_service::service_control_handler::ServiceControlHandlerResult;
+use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
+use windows_sys::Win32::Foundation::{GENERIC_READ, GENERIC_WRITE};
+use windows_sys::Win32::Security::Authorization::SetEntriesInAclW;
+use windows_sys::Win32::Security::{
+    ACCESS_ALLOWED_ACE, ACL, AddAccessAllowedAce, InitializeSecurityDescriptor,
+    PSECURITY_DESCRIPTOR, SECURITY_DESCRIPTOR, SetSecurityDescriptorDacl,
+};
+
+use crate::{Bridge, Computer, Hardware};
+
+/// Name of the windows service
+pub const SERVICE_NAME: &str = "lhm-hardware-monitor-service";
+
+/// Display name for the service
+const SERVICE_DISPLAY_NAME: &str = "LHM Hardware Monitor";
+
+/// Type of the service
+const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
+
+// Service entrypoint
+pub fn service_main(_arguments: Vec<OsString>) {
+    setup_working_directory().expect("failed to setup working directory");
+
+    if let Err(err) = run_service() {}
+}
+
+/// Sets up the working directory for the service.
+///
+/// Services run with the working directory set to C:/Windows/System32 which
+/// is not where we want to store and load our application files from. We
+/// replace this with the executable path
+fn setup_working_directory() -> anyhow::Result<()> {
+    // Get the path to the executable
+    let exe_path = env::current_exe().context("failed to get current executable path")?;
+
+    // Get the directory containing the executable
+    let exe_dir = exe_path
+        .parent()
+        .context("Failed to get parent directory")?;
+
+    // Set the working directory to the executable's directory
+    env::set_current_dir(exe_dir).context("failed to set current directory")?;
+
+    // Set the working directory to the executable's directory
+    env::set_current_dir(exe_dir).context("failed to set current directory")?;
+
+    Ok(())
+}
+
+/// Restarts the windows service
+pub fn restart_service() -> anyhow::Result<()> {
+    stop_service()?;
+    start_service()?;
+    Ok(())
+}
+
+/// Creates a new windows service for the oguard exe using sc.exe
+pub fn create_service() -> anyhow::Result<()> {
+    debug!("creating service");
+
+    // Get the path to the executable
+    let executable_path = env::current_exe().context("failed to get current executable path")?;
+
+    let manager =
+        ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CREATE_SERVICE)
+            .context("failed to access service manager")?;
+
+    // Create the service
+    manager
+        .create_service(
+            &ServiceInfo {
+                name: OsString::from(SERVICE_NAME),
+                display_name: OsString::from(SERVICE_DISPLAY_NAME),
+                service_type: SERVICE_TYPE,
+                start_type: ServiceStartType::AutoStart,
+                error_control: ServiceErrorControl::Normal,
+                executable_path,
+                launch_arguments: vec![],
+                dependencies: vec![],
+                account_name: None, // run as System
+                account_password: None,
+            },
+            ServiceAccess::QUERY_STATUS,
+        )
+        .context("failed to create service")?;
+
+    Ok(())
+}
+
+/// Starts the windows service
+pub fn start_service() -> anyhow::Result<()> {
+    debug!("starting service");
+
+    let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)
+        .context("failed to access service manager")?;
+
+    let service = manager
+        .open_service(SERVICE_NAME, ServiceAccess::START)
+        .context("failed to open service")?;
+    service
+        .start::<&str>(&[])
+        .context("failed to start service")?;
+
+    Ok(())
+}
+
+/// Stops the windows service
+pub fn stop_service() -> anyhow::Result<()> {
+    debug!("stopping service");
+
+    let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)
+        .context("failed to access service manager")?;
+
+    let service = manager
+        .open_service(SERVICE_NAME, ServiceAccess::STOP)
+        .context("failed to open service")?;
+
+    service.stop().context("failed to stop service")?;
+
+    Ok(())
+}
+
+/// Deletes the windows service
+pub fn delete_service() -> anyhow::Result<()> {
+    debug!("deleting service");
+
+    let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)
+        .context("failed to access service manager")?;
+
+    let service = manager
+        .open_service(SERVICE_NAME, ServiceAccess::DELETE)
+        .context("failed to open service")?;
+
+    service.delete().context("failed to delete service")?;
+
+    Ok(())
+}
+
+/// Runs the service and handles service events
+fn run_service() -> anyhow::Result<()> {
+    // Define system service event handler that will be receiving service events.
+    let event_handler = move |control_event| -> ServiceControlHandlerResult {
+        match control_event {
+            // Notifies a service to report its current status information to the service
+            // control manager. Always return NoError even if not implemented.
+            ServiceControl::Interrogate => ServiceControlHandlerResult::NoError,
+
+            // Handle stop
+            ServiceControl::Stop => {
+                // Shutdown
+                ServiceControlHandlerResult::NoError
+            }
+
+            // treat the UserEvent as a stop request
+            ServiceControl::UserEvent(code) => {
+                if code.to_raw() == 130 {
+                    // Shutdown
+                }
+                ServiceControlHandlerResult::NoError
+            }
+
+            _ => ServiceControlHandlerResult::NotImplemented,
+        }
+    };
+
+    // Register system service event handler.
+    // The returned status handle should be used to report service status changes to the system.
+    let status_handle = service_control_handler::register(SERVICE_NAME, event_handler)?;
+
+    // Tell the system that service is running
+    status_handle.set_service_status(ServiceStatus {
+        service_type: SERVICE_TYPE,
+        current_state: ServiceState::Running,
+        controls_accepted: ServiceControlAccept::STOP,
+        exit_code: ServiceExitCode::Win32(0),
+        checkpoint: 0,
+        wait_hint: Duration::default(),
+        process_id: None,
+    })?;
+
+    // Run service
+    let bridge = Bridge::init();
+    let mut computer = Computer::create(&bridge);
+
+    // Perform initial update
+    computer.update();
+
+    let listener = PipeListenerOptions::new()
+        .mode(interprocess::os::windows::named_pipe::PipeMode::Messages)
+        .security_descriptor(Some(
+            SecurityDescriptor::deserialize(
+                U16CString::from_str_truncate("D:(A;;GA;;;WD)").as_ucstr(),
+            )
+            .unwrap(),
+        ))
+        .path(r"\\.\pipe\LHMLibreHardwareMonitorService")
+        .create_duplex::<pipe_mode::Messages>()
+        .unwrap();
+
+    loop {
+        let stream = listener.accept().unwrap();
+        let bridge = bridge.clone();
+        std::thread::spawn(move || handle_pipe_stream(bridge, stream));
+    }
+
+    // Tell the system that service has stopped.
+    status_handle.set_service_status(ServiceStatus {
+        service_type: SERVICE_TYPE,
+        current_state: ServiceState::Stopped,
+        controls_accepted: ServiceControlAccept::empty(),
+        exit_code: ServiceExitCode::Win32(0),
+        checkpoint: 0,
+        wait_hint: Duration::default(),
+        process_id: None,
+    })?;
+
+    Ok(())
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "type")]
+pub enum PipeRequest {
+    Update,
+    GetHardware,
+}
+
+#[derive(Serialize)]
+#[serde(tag = "type")]
+pub enum PipeResponse {
+    Hardware { hardware: Vec<Hardware> },
+}
+
+pub fn handle_pipe_stream(bridge: Bridge, mut stream: DuplexPipeStream<pipe_mode::Messages>) {
+    let mut buf = MsgBuf::from(Vec::with_capacity(256));
+    let mut computer = Computer::create(&bridge);
+    computer.update();
+
+    loop {
+        stream.recv_msg(&mut buf, None).unwrap();
+        let buf = match buf.msg() {
+            Some(value) => value,
+            None => continue,
+        };
+        let request: PipeRequest = serde_json::from_slice(buf).unwrap();
+
+        match request {
+            PipeRequest::Update => {
+                computer.update();
+            }
+            PipeRequest::GetHardware => {
+                let hardware = computer.get_hardware();
+                let response = PipeResponse::Hardware { hardware };
+                let value = serde_json::to_vec(&response).unwrap();
+                stream.send(&value).unwrap();
+                stream.flush().unwrap();
+            }
+        }
+    }
+}
