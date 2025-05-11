@@ -12,7 +12,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="DllExport" Version="1.8.0" />
     <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.4" />
   </ItemGroup>
 

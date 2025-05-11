@@ -7,18 +7,17 @@
 //! Also includes logic for managing the service (Adding, Removing, and Restarting the service)
 
 use anyhow::Context;
-use interprocess::os::windows::named_pipe::{
-    DuplexPipeStream, PipeListener, PipeListenerOptions, PipeStream, pipe_mode,
-};
+use interprocess::os::windows::named_pipe::tokio::{DuplexPipeStream, PipeListenerOptionsExt};
+use interprocess::os::windows::named_pipe::{PipeListenerOptions, pipe_mode};
 use interprocess::os::windows::security_descriptor::SecurityDescriptor;
-use recvmsg::{MsgBuf, RecvMsg};
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::ffi::OsString;
-use std::sync::{Arc, mpsc};
 use std::time::Duration;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::sync::mpsc;
 use tracing::debug;
-use widestring::{U16CStr, U16CString};
+use widestring::U16CString;
 use windows_service::service::{
     ServiceAccess, ServiceControl, ServiceControlAccept, ServiceErrorControl, ServiceExitCode,
     ServiceInfo, ServiceStartType, ServiceState, ServiceStatus, ServiceType,
@@ -26,14 +25,9 @@ use windows_service::service::{
 use windows_service::service_control_handler;
 use windows_service::service_control_handler::ServiceControlHandlerResult;
 use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
-use windows_sys::Win32::Foundation::{GENERIC_READ, GENERIC_WRITE};
-use windows_sys::Win32::Security::Authorization::SetEntriesInAclW;
-use windows_sys::Win32::Security::{
-    ACCESS_ALLOWED_ACE, ACL, AddAccessAllowedAce, InitializeSecurityDescriptor,
-    PSECURITY_DESCRIPTOR, SECURITY_DESCRIPTOR, SetSecurityDescriptorDacl,
-};
 
-use crate::{Bridge, Computer, Hardware};
+use crate::Hardware;
+use crate::actor::{ComputerActor, ComputerActorHandle};
 
 /// Name of the windows service
 pub const SERVICE_NAME: &str = "lhm-hardware-monitor-service";
@@ -48,7 +42,7 @@ const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
 pub fn service_main(_arguments: Vec<OsString>) {
     setup_working_directory().expect("failed to setup working directory");
 
-    if let Err(err) = run_service() {}
+    if let Err(_err) = run_service() {}
 }
 
 /// Sets up the working directory for the service.
@@ -165,6 +159,9 @@ pub fn delete_service() -> anyhow::Result<()> {
 
 /// Runs the service and handles service events
 fn run_service() -> anyhow::Result<()> {
+    // Create a channel to be able to poll a stop event from the service worker loop.
+    let (shutdown_tx, mut shutdown_rx) = mpsc::channel(1);
+
     // Define system service event handler that will be receiving service events.
     let event_handler = move |control_event| -> ServiceControlHandlerResult {
         match control_event {
@@ -174,14 +171,14 @@ fn run_service() -> anyhow::Result<()> {
 
             // Handle stop
             ServiceControl::Stop => {
-                // Shutdown
+                _ = shutdown_tx.try_send(());
                 ServiceControlHandlerResult::NoError
             }
 
             // treat the UserEvent as a stop request
             ServiceControl::UserEvent(code) => {
                 if code.to_raw() == 130 {
-                    // Shutdown
+                    _ = shutdown_tx.try_send(());
                 }
                 ServiceControlHandlerResult::NoError
             }
@@ -205,30 +202,18 @@ fn run_service() -> anyhow::Result<()> {
         process_id: None,
     })?;
 
-    // Run service
-    let bridge = Bridge::init();
-    let mut computer = Computer::create(&bridge);
+    // Create the async runtime
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .expect("Failed building the Runtime");
 
-    // Perform initial update
-    computer.update();
+    runtime.spawn(run_server());
 
-    let listener = PipeListenerOptions::new()
-        .mode(interprocess::os::windows::named_pipe::PipeMode::Messages)
-        .security_descriptor(Some(
-            SecurityDescriptor::deserialize(
-                U16CString::from_str_truncate("D:(A;;GA;;;WD)").as_ucstr(),
-            )
-            .unwrap(),
-        ))
-        .path(r"\\.\pipe\LHMLibreHardwareMonitorService")
-        .create_duplex::<pipe_mode::Messages>()
-        .unwrap();
-
-    loop {
-        let stream = listener.accept().unwrap();
-        let bridge = bridge.clone();
-        std::thread::spawn(move || handle_pipe_stream(bridge, stream));
-    }
+    // Block waiting for shutdown
+    runtime.block_on(async move {
+        _ = shutdown_rx.recv().await;
+    });
 
     // Tell the system that service has stopped.
     status_handle.set_service_status(ServiceStatus {
@@ -244,6 +229,28 @@ fn run_service() -> anyhow::Result<()> {
     Ok(())
 }
 
+async fn run_server() {
+    let handle = ComputerActor::create();
+
+    let listener = PipeListenerOptions::new()
+        .mode(interprocess::os::windows::named_pipe::PipeMode::Bytes)
+        .security_descriptor(Some(
+            SecurityDescriptor::deserialize(
+                U16CString::from_str_truncate("D:(A;;GA;;;WD)").as_ucstr(),
+            )
+            .unwrap(),
+        ))
+        .path(r"\\.\pipe\LHMLibreHardwareMonitorService")
+        .create_tokio_duplex::<pipe_mode::Bytes>()
+        .unwrap();
+
+    loop {
+        let stream = listener.accept().await.unwrap();
+        let handle = handle.clone();
+        tokio::spawn(handle_pipe_stream(handle, stream));
+    }
+}
+
 #[derive(Deserialize)]
 #[serde(tag = "type")]
 pub enum PipeRequest {
@@ -257,30 +264,51 @@ pub enum PipeResponse {
     Hardware { hardware: Vec<Hardware> },
 }
 
-pub fn handle_pipe_stream(bridge: Bridge, mut stream: DuplexPipeStream<pipe_mode::Messages>) {
-    let mut buf = MsgBuf::from(Vec::with_capacity(256));
-    let mut computer = Computer::create(&bridge);
-    computer.update();
-
+pub async fn handle_pipe_stream(
+    handle: ComputerActorHandle,
+    mut stream: DuplexPipeStream<pipe_mode::Bytes>,
+) {
     loop {
-        stream.recv_msg(&mut buf, None).unwrap();
-        let buf = match buf.msg() {
-            Some(value) => value,
-            None => continue,
-        };
-        let request: PipeRequest = serde_json::from_slice(buf).unwrap();
+        let request: PipeRequest = recv_message(&mut stream).await;
 
         match request {
             PipeRequest::Update => {
-                computer.update();
+                handle.update().await;
             }
             PipeRequest::GetHardware => {
-                let hardware = computer.get_hardware();
+                let hardware = handle.get_hardware().await;
                 let response = PipeResponse::Hardware { hardware };
-                let value = serde_json::to_vec(&response).unwrap();
-                stream.send(&value).unwrap();
-                stream.flush().unwrap();
+                send_message(&mut stream, response).await;
             }
         }
     }
+}
+
+async fn send_message(stream: &mut DuplexPipeStream<pipe_mode::Bytes>, request: PipeResponse) {
+    let data_bytes = serde_json::to_vec(&request).unwrap();
+    let length = data_bytes.len() as u32;
+    let length_bytes = length.to_be_bytes();
+
+    // Write the length
+    stream.write_all(&length_bytes).await.unwrap();
+    // Write the actual message
+    stream.write_all(&data_bytes).await.unwrap();
+
+    // Flush the whole message
+    stream.flush().await.unwrap();
+}
+
+async fn recv_message(stream: &mut DuplexPipeStream<pipe_mode::Bytes>) -> PipeRequest {
+    let mut len_buffer = [0u8; 4];
+
+    // Read the length of the payload
+    stream.read_exact(&mut len_buffer).await.unwrap();
+    let length = u32::from_be_bytes(len_buffer) as usize;
+
+    // Read the entire payload
+    let mut data_buffer = vec![0u8; length];
+    stream.read_exact(&mut data_buffer).await.unwrap();
+
+    let response: PipeRequest = serde_json::from_slice(&data_buffer).unwrap();
+    response
 }

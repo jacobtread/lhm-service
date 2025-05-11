@@ -1,17 +1,16 @@
 use anyhow::Context;
 use clap::{Parser, Subcommand};
-use interprocess::os::windows::named_pipe::{PipeListenerOptions, pipe_mode};
 use num_enum::TryFromPrimitive;
 
 #[macro_use]
 extern crate dlopen_derive;
 
+mod actor;
 mod ffi;
 mod service;
 
 pub use ffi::{Bridge, Computer};
 use serde::Serialize;
-use service::handle_pipe_stream;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Hardware {
@@ -121,25 +120,6 @@ fn main() -> anyhow::Result<()> {
             Commands::Delete => service::delete_service(),
         };
     }
-
-    // Run service
-    // let bridge = Bridge::init();
-    // let mut computer = Computer::create(&bridge);
-
-    // // Perform initial update
-    // computer.update();
-
-    // let listener = PipeListenerOptions::new()
-    //     .mode(interprocess::os::windows::named_pipe::PipeMode::Messages)
-    //     .path(r"\\.\pipe\LHMLibreHardwareMonitorService")
-    //     .create_duplex::<pipe_mode::Messages>()
-    //     .unwrap();
-
-    // loop {
-    //     let stream = listener.accept().unwrap();
-    //     let bridge = bridge.clone();
-    //     std::thread::spawn(move || handle_pipe_stream(bridge, stream));
-    // }
 
     windows_service::service_dispatcher::start(service::SERVICE_NAME, ffi_service_main)
         .context("failed to start service")?;

@@ -3,7 +3,6 @@ use std::{
     marker::PhantomData,
     ptr::null,
     rc::Rc,
-    sync::Arc,
 };
 
 use dlopen::wrapper::{Container, WrapperApi};
@@ -44,7 +43,7 @@ struct BridgeApi {
 
 #[derive(Clone)]
 pub struct Bridge {
-    inner: Arc<Container<BridgeApi>>,
+    inner: Rc<Container<BridgeApi>>,
 }
 
 impl Bridge {
@@ -52,13 +51,13 @@ impl Bridge {
         let container: Container<BridgeApi> = unsafe { Container::load("lhm-bridge.dll") }
             .expect("Could not open library or load symbols");
         Self {
-            inner: Arc::new(container),
+            inner: Rc::new(container),
         }
     }
 }
 
 pub struct Computer {
-    bridge: Arc<Container<BridgeApi>>,
+    bridge: Rc<Container<BridgeApi>>,
     instance: *const c_void,
 }
 
