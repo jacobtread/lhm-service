@@ -10,24 +10,27 @@ pub struct ComputerActorHandle {
 }
 
 impl ComputerActorHandle {
-    pub async fn update(&self) {
+    pub async fn update(&self) -> anyhow::Result<()> {
         let (tx, rx) = oneshot::channel();
-        self.tx.send(ComputerActorMessage::Update { tx }).unwrap();
-        rx.await.unwrap();
+        self.tx.send(ComputerActorMessage::Update { tx })?;
+        rx.await.map_err(|err| err.into())
     }
 
-    pub async fn get_hardware(&self) -> Vec<Hardware> {
+    pub async fn get_hardware(&self) -> anyhow::Result<Vec<Hardware>> {
         let (tx, rx) = oneshot::channel();
-        self.tx
-            .send(ComputerActorMessage::GetHardware { tx })
-            .unwrap();
-        rx.await.unwrap()
+        self.tx.send(ComputerActorMessage::GetHardware { tx })?;
+        let value = rx.await??;
+        Ok(value)
     }
 }
 
 pub enum ComputerActorMessage {
-    Update { tx: oneshot::Sender<()> },
-    GetHardware { tx: oneshot::Sender<Vec<Hardware>> },
+    Update {
+        tx: oneshot::Sender<()>,
+    },
+    GetHardware {
+        tx: oneshot::Sender<anyhow::Result<Vec<Hardware>>>,
+    },
 }
 
 impl ComputerActor {

@@ -13,6 +13,7 @@ use interprocess::os::windows::security_descriptor::SecurityDescriptor;
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::ffi::OsString;
+use std::io::ErrorKind;
 use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc;
@@ -229,23 +230,19 @@ fn run_service() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn run_server() {
+async fn run_server() -> std::io::Result<()> {
     let handle = ComputerActor::create();
 
     let listener = PipeListenerOptions::new()
         .mode(interprocess::os::windows::named_pipe::PipeMode::Bytes)
-        .security_descriptor(Some(
-            SecurityDescriptor::deserialize(
-                U16CString::from_str_truncate("D:(A;;GA;;;WD)").as_ucstr(),
-            )
-            .unwrap(),
-        ))
+        .security_descriptor(Some(SecurityDescriptor::deserialize(
+            U16CString::from_str_truncate("D:(A;;GA;;;WD)").as_ucstr(),
+        )?))
         .path(r"\\.\pipe\LHMLibreHardwareMonitorService")
-        .create_tokio_duplex::<pipe_mode::Bytes>()
-        .unwrap();
+        .create_tokio_duplex::<pipe_mode::Bytes>()?;
 
     loop {
-        let stream = listener.accept().await.unwrap();
+        let stream = listener.accept().await?;
         let handle = handle.clone();
         tokio::spawn(handle_pipe_stream(handle, stream));
     }
@@ -269,46 +266,66 @@ pub async fn handle_pipe_stream(
     mut stream: DuplexPipeStream<pipe_mode::Bytes>,
 ) {
     loop {
-        let request: PipeRequest = recv_message(&mut stream).await;
+        let request: PipeRequest = match recv_message(&mut stream).await {
+            Ok(value) => value,
+            Err(_) => return,
+        };
 
         match request {
             PipeRequest::Update => {
-                handle.update().await;
+                if handle.update().await.is_err() {
+                    return;
+                }
             }
             PipeRequest::GetHardware => {
-                let hardware = handle.get_hardware().await;
+                let hardware = match handle.get_hardware().await {
+                    Ok(value) => value,
+                    Err(_) => return,
+                };
                 let response = PipeResponse::Hardware { hardware };
-                send_message(&mut stream, response).await;
+
+                if send_message(&mut stream, response).await.is_err() {
+                    return;
+                }
             }
         }
     }
 }
 
-async fn send_message(stream: &mut DuplexPipeStream<pipe_mode::Bytes>, request: PipeResponse) {
-    let data_bytes = serde_json::to_vec(&request).unwrap();
+async fn send_message(
+    stream: &mut DuplexPipeStream<pipe_mode::Bytes>,
+    request: PipeResponse,
+) -> std::io::Result<()> {
+    let data_bytes =
+        serde_json::to_vec(&request).map_err(|err| std::io::Error::new(ErrorKind::Other, err))?;
     let length = data_bytes.len() as u32;
     let length_bytes = length.to_be_bytes();
 
     // Write the length
-    stream.write_all(&length_bytes).await.unwrap();
+    stream.write_all(&length_bytes).await?;
     // Write the actual message
-    stream.write_all(&data_bytes).await.unwrap();
+    stream.write_all(&data_bytes).await?;
 
     // Flush the whole message
-    stream.flush().await.unwrap();
+    stream.flush().await?;
+
+    Ok(())
 }
 
-async fn recv_message(stream: &mut DuplexPipeStream<pipe_mode::Bytes>) -> PipeRequest {
+async fn recv_message(
+    stream: &mut DuplexPipeStream<pipe_mode::Bytes>,
+) -> std::io::Result<PipeRequest> {
     let mut len_buffer = [0u8; 4];
 
     // Read the length of the payload
-    stream.read_exact(&mut len_buffer).await.unwrap();
+    stream.read_exact(&mut len_buffer).await?;
     let length = u32::from_be_bytes(len_buffer) as usize;
 
     // Read the entire payload
     let mut data_buffer = vec![0u8; length];
-    stream.read_exact(&mut data_buffer).await.unwrap();
+    stream.read_exact(&mut data_buffer).await?;
 
-    let response: PipeRequest = serde_json::from_slice(&data_buffer).unwrap();
-    response
+    let response: PipeRequest = serde_json::from_slice(&data_buffer)
+        .map_err(|err| std::io::Error::new(ErrorKind::Other, err))?;
+    Ok(response)
 }

@@ -81,7 +81,7 @@ impl Computer {
         }
     }
 
-    pub fn get_hardware(&mut self) -> Vec<Hardware> {
+    pub fn get_hardware(&mut self) -> anyhow::Result<Vec<Hardware>> {
         // Request the hardware array
         let hardware = unsafe { self.bridge.get_computer_hardware(self.instance) };
 
@@ -107,7 +107,7 @@ impl Drop for Computer {
 }
 
 /// Copy the C# hardware plain structure into the Rust [Hardware] struct
-fn copy_hardware_safe(hardware: &RArray<CHardware>) -> Vec<Hardware> {
+fn copy_hardware_safe(hardware: &RArray<CHardware>) -> anyhow::Result<Vec<Hardware>> {
     let hardware_slice = unsafe {
         std::slice::from_raw_parts(hardware.data.cast::<CHardware>(), hardware.length as usize)
     };
@@ -118,9 +118,9 @@ fn copy_hardware_safe(hardware: &RArray<CHardware>) -> Vec<Hardware> {
         let name = unsafe { CStr::from_ptr(item.name) };
         let name = name.to_string_lossy().into_owned();
 
-        let ty = HardwareType::try_from_primitive(item.ty).unwrap();
-        let children = copy_hardware_safe(&item.children);
-        let sensors = copy_sensors_safe(&item.sensors);
+        let ty = HardwareType::try_from_primitive(item.ty)?;
+        let children = copy_hardware_safe(&item.children)?;
+        let sensors = copy_sensors_safe(&item.sensors)?;
 
         hardware.push(Hardware {
             name,
@@ -130,11 +130,11 @@ fn copy_hardware_safe(hardware: &RArray<CHardware>) -> Vec<Hardware> {
         });
     }
 
-    hardware
+    Ok(hardware)
 }
 
 /// Copy the C# sensor plain structure into the Rust [Sensor] struct
-fn copy_sensors_safe(sensors: &RArray<CSensor>) -> Vec<Sensor> {
+fn copy_sensors_safe(sensors: &RArray<CSensor>) -> anyhow::Result<Vec<Sensor>> {
     let sensors_slice = unsafe {
         std::slice::from_raw_parts(sensors.data.cast::<CSensor>(), sensors.length as usize)
     };
@@ -144,7 +144,7 @@ fn copy_sensors_safe(sensors: &RArray<CSensor>) -> Vec<Sensor> {
     for item in sensors_slice {
         let name = unsafe { CStr::from_ptr(item.name) };
         let name = name.to_string_lossy().into_owned();
-        let ty = SensorType::try_from_primitive(item.ty).unwrap();
+        let ty = SensorType::try_from_primitive(item.ty)?;
 
         sensors.push(Sensor {
             name,
@@ -153,5 +153,5 @@ fn copy_sensors_safe(sensors: &RArray<CSensor>) -> Vec<Sensor> {
         });
     }
 
-    sensors
+    Ok(sensors)
 }
