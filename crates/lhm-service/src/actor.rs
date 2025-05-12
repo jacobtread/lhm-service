@@ -1,7 +1,7 @@
-use lhm_shared::Hardware;
+use lhm_shared::{ComputerOptions, Hardware};
 use tokio::sync::{mpsc, oneshot};
 
-use lhm_sys::{Bridge, Computer, ComputerOptions};
+use lhm_sys::{Bridge, Computer};
 
 pub struct ComputerActor {}
 
@@ -11,6 +11,13 @@ pub struct ComputerActorHandle {
 }
 
 impl ComputerActorHandle {
+    pub async fn set_options(&self, options: ComputerOptions) -> anyhow::Result<()> {
+        let (tx, rx) = oneshot::channel();
+        self.tx
+            .send(ComputerActorMessage::SetOptions { options, tx })?;
+        rx.await.map_err(|err| err.into())
+    }
+
     pub async fn update(&self) -> anyhow::Result<()> {
         let (tx, rx) = oneshot::channel();
         self.tx.send(ComputerActorMessage::Update { tx })?;
@@ -26,6 +33,11 @@ impl ComputerActorHandle {
 }
 
 pub enum ComputerActorMessage {
+    SetOptions {
+        options: ComputerOptions,
+        tx: oneshot::Sender<()>,
+    },
+
     Update {
         tx: oneshot::Sender<()>,
     },
@@ -35,16 +47,12 @@ pub enum ComputerActorMessage {
 }
 
 impl ComputerActor {
-    pub fn create(options: ComputerOptions) -> ComputerActorHandle {
+    pub fn create(bridge: Bridge, options: ComputerOptions) -> ComputerActorHandle {
         let (tx, mut rx) = mpsc::unbounded_channel();
 
         std::thread::spawn(move || {
             // Run service
-            let bridge = Bridge::load().unwrap();
             let mut computer = Computer::create(&bridge, options);
-
-            // Perform initial update
-            computer.update();
 
             while let Some(msg) = rx.blocking_recv() {
                 match msg {
@@ -55,6 +63,10 @@ impl ComputerActor {
                     ComputerActorMessage::GetHardware { tx } => {
                         let hardware = computer.get_hardware();
                         _ = tx.send(hardware);
+                    }
+                    ComputerActorMessage::SetOptions { options, tx } => {
+                        computer.update_options(options);
+                        _ = tx.send(());
                     }
                 }
             }

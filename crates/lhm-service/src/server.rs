@@ -1,22 +1,19 @@
-use crate::actor::{ComputerActor, ComputerActorHandle};
+use crate::actor::ComputerActor;
 use interprocess::os::windows::named_pipe::tokio::{DuplexPipeStream, PipeListenerOptionsExt};
 use interprocess::os::windows::named_pipe::{PipeListenerOptions, pipe_mode};
 use interprocess::os::windows::security_descriptor::SecurityDescriptor;
 use lhm_shared::PipeRequest;
 use lhm_shared::PipeResponse;
-use lhm_sys::ComputerOptions;
+use lhm_sys::Bridge;
 use std::io::ErrorKind;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::task::spawn_local;
 use widestring::U16CString;
 
 pub async fn run_server() -> std::io::Result<()> {
-    let handle = ComputerActor::create(ComputerOptions {
-        cpu_enabled: true,
-        gpu_enabled: true,
-        motherboard_enabled: true,
-        controller_enabled: true,
-        ..Default::default()
-    });
+    let bridge = Bridge::load()
+        // Handle load error
+        .map_err(|err| std::io::Error::new(ErrorKind::Other, err))?;
 
     let listener = PipeListenerOptions::new()
         .mode(interprocess::os::windows::named_pipe::PipeMode::Bytes)
@@ -28,15 +25,14 @@ pub async fn run_server() -> std::io::Result<()> {
 
     loop {
         let stream = listener.accept().await?;
-        let handle = handle.clone();
-        tokio::spawn(handle_pipe_stream(handle, stream));
+        spawn_local(handle_pipe_stream(bridge.clone(), stream));
     }
 }
 
-pub async fn handle_pipe_stream(
-    handle: ComputerActorHandle,
-    mut stream: DuplexPipeStream<pipe_mode::Bytes>,
-) {
+pub async fn handle_pipe_stream(bridge: Bridge, mut stream: DuplexPipeStream<pipe_mode::Bytes>) {
+    // Initialize an actor
+    let handle = ComputerActor::create(bridge, Default::default());
+
     loop {
         let request: PipeRequest = match recv_message(&mut stream).await {
             Ok(value) => value,
@@ -57,6 +53,11 @@ pub async fn handle_pipe_stream(
                 let response = PipeResponse::Hardware { hardware };
 
                 if send_message(&mut stream, response).await.is_err() {
+                    return;
+                }
+            }
+            PipeRequest::SetOptions { options } => {
+                if handle.set_options(options).await.is_err() {
                     return;
                 }
             }

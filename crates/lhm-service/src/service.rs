@@ -11,6 +11,7 @@ use std::env;
 use std::ffi::OsString;
 use std::time::Duration;
 use tokio::sync::mpsc;
+use tokio::task::LocalSet;
 use tracing::debug;
 use windows_service::service::{
     ServiceAccess, ServiceControl, ServiceControlAccept, ServiceErrorControl, ServiceExitCode,
@@ -196,17 +197,18 @@ fn run_service() -> anyhow::Result<()> {
     })?;
 
     // Create the async runtime
-    let runtime = tokio::runtime::Builder::new_multi_thread()
+    let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .expect("Failed building the Runtime");
 
-    runtime.spawn(run_server());
+    let local_set = LocalSet::new();
+    local_set.spawn_local(run_server());
 
     // Block waiting for shutdown
-    runtime.block_on(async move {
+    runtime.block_on(local_set.run_until(async move {
         _ = shutdown_rx.recv().await;
-    });
+    }));
 
     // Tell the system that service has stopped.
     status_handle.set_service_status(ServiceStatus {

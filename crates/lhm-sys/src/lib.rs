@@ -9,10 +9,10 @@ extern crate dlopen_derive;
 
 mod ffi;
 
-use std::rc::Rc;
+use std::sync::Arc;
 
 use ffi::{ComputerInstance, SharedBridgeContainer, load_bridge_dll};
-use lhm_shared::Hardware;
+use lhm_shared::{ComputerOptions, Hardware};
 
 /// Instance of the bridge library used for creating computer instances
 #[derive(Clone)]
@@ -24,22 +24,9 @@ impl Bridge {
     pub fn load() -> Result<Bridge, dlopen::Error> {
         let container = load_bridge_dll()?;
         Ok(Self {
-            inner: Rc::new(container),
+            inner: Arc::new(container),
         })
     }
-}
-
-#[derive(Debug, Default, Clone)]
-pub struct ComputerOptions {
-    pub battery_enabled: bool,
-    pub controller_enabled: bool,
-    pub cpu_enabled: bool,
-    pub gpu_enabled: bool,
-    pub memory_enabled: bool,
-    pub motherboard_enabled: bool,
-    pub network_enabled: bool,
-    pub psu_enabled: bool,
-    pub storage_enabled: bool,
 }
 
 /// Instance of a computer, can be used to request and update the list

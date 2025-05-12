@@ -1,9 +1,23 @@
 use num_enum::TryFromPrimitive;
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Default, Clone, Deserialize, Serialize)]
+pub struct ComputerOptions {
+    pub battery_enabled: bool,
+    pub controller_enabled: bool,
+    pub cpu_enabled: bool,
+    pub gpu_enabled: bool,
+    pub memory_enabled: bool,
+    pub motherboard_enabled: bool,
+    pub network_enabled: bool,
+    pub psu_enabled: bool,
+    pub storage_enabled: bool,
+}
+
 #[derive(Deserialize, Serialize)]
 #[serde(tag = "type")]
 pub enum PipeRequest {
+    SetOptions { options: ComputerOptions },
     Update,
     GetHardware,
 }

@@ -6,10 +6,10 @@ use std::{
     marker::PhantomData,
     path::Path,
     ptr::null,
-    rc::Rc,
+    sync::Arc,
 };
 
-use crate::ComputerOptions;
+use lhm_shared::ComputerOptions;
 
 #[repr(C)]
 pub(crate) struct RComputerOptions {
@@ -94,7 +94,7 @@ pub(crate) fn load_bridge_dll() -> Result<BridgeContainer, dlopen::Error> {
 }
 
 pub(crate) type BridgeContainer = Container<BridgeApi>;
-pub(crate) type SharedBridgeContainer = Rc<BridgeContainer>;
+pub(crate) type SharedBridgeContainer = Arc<BridgeContainer>;
 
 pub struct ComputerInstance {
     bridge: SharedBridgeContainer,
