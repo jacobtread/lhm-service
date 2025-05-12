@@ -9,6 +9,37 @@ use std::{
     rc::Rc,
 };
 
+use crate::ComputerOptions;
+
+#[repr(C)]
+pub(crate) struct RComputerOptions {
+    battery_enabled: bool,
+    controller_enabled: bool,
+    cpu_enabled: bool,
+    gpu_enabled: bool,
+    memory_enabled: bool,
+    motherboard_enabled: bool,
+    network_enabled: bool,
+    psu_enabled: bool,
+    storage_enabled: bool,
+}
+
+impl From<ComputerOptions> for RComputerOptions {
+    fn from(value: ComputerOptions) -> Self {
+        Self {
+            battery_enabled: value.battery_enabled,
+            controller_enabled: value.controller_enabled,
+            cpu_enabled: value.cpu_enabled,
+            gpu_enabled: value.gpu_enabled,
+            memory_enabled: value.memory_enabled,
+            motherboard_enabled: value.motherboard_enabled,
+            network_enabled: value.network_enabled,
+            psu_enabled: value.psu_enabled,
+            storage_enabled: value.storage_enabled,
+        }
+    }
+}
+
 #[repr(C)]
 struct RArray<T> {
     length: u32,
@@ -33,9 +64,11 @@ struct CSensor {
 
 #[derive(WrapperApi)]
 pub(crate) struct BridgeApi {
-    create_computer_instance: unsafe extern "C" fn() -> *const c_void,
+    create_computer_instance: unsafe extern "C" fn(options: RComputerOptions) -> *const c_void,
     free_computer_instance: unsafe extern "C" fn(instance: *const c_void),
     update_computer_instance: unsafe extern "C" fn(instance: *const c_void),
+    update_computer_instance_options:
+        unsafe extern "C" fn(instance: *const c_void, options: RComputerOptions),
     get_computer_hardware: unsafe extern "C" fn(instance: *const c_void) -> RArray<CHardware>,
     free_hardware_array: unsafe extern "C" fn(hardware_array: RArray<CHardware>),
 }
@@ -69,8 +102,8 @@ pub struct ComputerInstance {
 }
 
 impl ComputerInstance {
-    pub fn create(bridge: SharedBridgeContainer) -> Self {
-        let instance = unsafe { bridge.create_computer_instance() };
+    pub fn create(bridge: SharedBridgeContainer, options: RComputerOptions) -> Self {
+        let instance = unsafe { bridge.create_computer_instance(options) };
 
         if instance.is_null() {
             panic!("failed to create instance")
@@ -82,6 +115,13 @@ impl ComputerInstance {
     pub fn update(&mut self) {
         unsafe {
             self.bridge.update_computer_instance(self.instance);
+        }
+    }
+
+    pub fn update_options(&mut self, options: RComputerOptions) {
+        unsafe {
+            self.bridge
+                .update_computer_instance_options(self.instance, options);
         }
     }
 

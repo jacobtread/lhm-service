@@ -1,7 +1,7 @@
 use lhm_shared::Hardware;
 use tokio::sync::{mpsc, oneshot};
 
-use lhm_sys::{Bridge, Computer};
+use lhm_sys::{Bridge, Computer, ComputerOptions};
 
 pub struct ComputerActor {}
 
@@ -35,13 +35,13 @@ pub enum ComputerActorMessage {
 }
 
 impl ComputerActor {
-    pub fn create() -> ComputerActorHandle {
+    pub fn create(options: ComputerOptions) -> ComputerActorHandle {
         let (tx, mut rx) = mpsc::unbounded_channel();
 
         std::thread::spawn(move || {
             // Run service
             let bridge = Bridge::load().unwrap();
-            let mut computer = Computer::create(&bridge);
+            let mut computer = Computer::create(&bridge, options);
 
             // Perform initial update
             computer.update();

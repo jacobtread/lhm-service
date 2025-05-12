@@ -4,12 +4,19 @@ use interprocess::os::windows::named_pipe::{PipeListenerOptions, pipe_mode};
 use interprocess::os::windows::security_descriptor::SecurityDescriptor;
 use lhm_shared::PipeRequest;
 use lhm_shared::PipeResponse;
+use lhm_sys::ComputerOptions;
 use std::io::ErrorKind;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use widestring::U16CString;
 
 pub async fn run_server() -> std::io::Result<()> {
-    let handle = ComputerActor::create();
+    let handle = ComputerActor::create(ComputerOptions {
+        cpu_enabled: true,
+        gpu_enabled: true,
+        motherboard_enabled: true,
+        controller_enabled: true,
+        ..Default::default()
+    });
 
     let listener = PipeListenerOptions::new()
         .mode(interprocess::os::windows::named_pipe::PipeMode::Bytes)

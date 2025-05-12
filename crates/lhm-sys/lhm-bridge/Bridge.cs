@@ -33,16 +33,21 @@ public static class Exported
     /// </summary>
     /// <returns>Pointer to access the create computer instance</returns>
     [UnmanagedCallersOnly(EntryPoint = "create_computer_instance", CallConvs = new[] { typeof(CallConvCdecl) })]
-    public static IntPtr CreateComputerInstance()
+    public static IntPtr CreateComputerInstance(RComputerOptions options)
     {
         try
         {
             Computer computer = new Computer
             {
-                IsCpuEnabled = true,
-                IsGpuEnabled = true,
-                IsMotherboardEnabled = true,
-                IsControllerEnabled = true,
+                IsBatteryEnabled = options.battery_enabled,
+                IsControllerEnabled = options.controller_enabled,
+                IsCpuEnabled = options.cpu_enabled,
+                IsGpuEnabled = options.gpu_enabled,
+                IsMemoryEnabled = options.memory_enabled,
+                IsMotherboardEnabled = options.motherboard_enabled,
+                IsNetworkEnabled = options.network_enabled,
+                IsPsuEnabled = options.psu_enabled,
+                IsStorageEnabled = options.storage_enabled, 
             };
 
             computer.Open();
@@ -77,6 +82,38 @@ public static class Exported
         }
     }
 
+
+    /// <summary>
+    /// Updates the list of sensor instances for the computer instance
+    /// </summary>
+    /// <returns></returns>
+    [UnmanagedCallersOnly(EntryPoint = "update_computer_instance_options", CallConvs = new[] { typeof(CallConvCdecl) })]
+    public static void UpdateComputerInstanceOptions(IntPtr instance, RComputerOptions options)
+    {
+        try
+        {
+            // Ignore nullptr
+            if (instance == IntPtr.Zero) return;
+
+            var handle = GCHandle.FromIntPtr(instance);
+            if (handle.Target is Computer computer)
+            {
+                computer.IsBatteryEnabled = options.battery_enabled;
+                computer.IsControllerEnabled = options.controller_enabled;
+                computer.IsCpuEnabled = options.cpu_enabled;
+                computer.IsGpuEnabled = options.gpu_enabled;
+                computer.IsMemoryEnabled = options.memory_enabled;
+                computer.IsMotherboardEnabled = options.motherboard_enabled;
+                computer.IsNetworkEnabled = options.network_enabled;
+                computer.IsPsuEnabled = options.psu_enabled;
+                computer.IsStorageEnabled = options.storage_enabled;
+            }
+        }
+        catch
+        {
+        }
+    }
+
     /// <summary>
     /// Updates the list of sensor instances for the computer instance
     /// </summary>
@@ -98,6 +135,23 @@ public static class Exported
         catch
         {
         }
+    }
+
+    /// <summary>
+    /// Rust compatible options set
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential)]
+    public struct RComputerOptions
+    {
+        public bool battery_enabled;
+        public bool controller_enabled;
+        public bool cpu_enabled;
+        public bool gpu_enabled;
+        public bool memory_enabled;
+        public bool motherboard_enabled;
+        public bool network_enabled;
+        public bool psu_enabled;
+        public bool storage_enabled;
     }
 
     /// <summary>

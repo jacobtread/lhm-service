@@ -1,3 +1,9 @@
+//! # lhm-sys
+//!
+//! System library for working with Libre Hardware Monitor from rust, specifically creating a
+//! computer instance, updating it and requesting the list of hardware and sensors from Rust
+//!
+
 #[macro_use]
 extern crate dlopen_derive;
 
@@ -23,6 +29,19 @@ impl Bridge {
     }
 }
 
+#[derive(Debug, Default, Clone)]
+pub struct ComputerOptions {
+    pub battery_enabled: bool,
+    pub controller_enabled: bool,
+    pub cpu_enabled: bool,
+    pub gpu_enabled: bool,
+    pub memory_enabled: bool,
+    pub motherboard_enabled: bool,
+    pub network_enabled: bool,
+    pub psu_enabled: bool,
+    pub storage_enabled: bool,
+}
+
 /// Instance of a computer, can be used to request and update the list
 /// of devices. Must call [Computer::update] at least once for hardware
 /// to be available
@@ -31,13 +50,17 @@ pub struct Computer {
 }
 
 impl Computer {
-    pub fn create(bridge: &Bridge) -> Self {
-        let instance = ComputerInstance::create(bridge.inner.clone());
+    pub fn create(bridge: &Bridge, options: ComputerOptions) -> Self {
+        let instance = ComputerInstance::create(bridge.inner.clone(), options.into());
         Self { instance }
     }
 
     pub fn update(&mut self) {
         self.instance.update();
+    }
+
+    pub fn update_options(&mut self, options: ComputerOptions) {
+        self.instance.update_options(options.into());
     }
 
     pub fn get_hardware(&mut self) -> anyhow::Result<Vec<Hardware>> {
