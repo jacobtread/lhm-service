@@ -6,3 +6,11 @@ members = [
     "crates/lhm-client",
     "crates/lhm-sys",
 ]
+
+[workspace.dependencies]
+# Interprocess communication for client and service
+interprocess = { version = "2.2.3", features = ["tokio"] }
+
+# Serialization for underlying protocol
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

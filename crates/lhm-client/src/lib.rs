@@ -1,8 +1,8 @@
-use std::io::ErrorKind;
-
 use interprocess::os::windows::named_pipe::{pipe_mode, tokio::DuplexPipeStream};
-use lhm_shared::{ComputerOptions, Hardware, PIPE_NAME, PipeRequest, PipeResponse};
+use std::io::ErrorKind;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+pub use lhm_shared::*;
 
 pub struct LHMClient {
     pipe: DuplexPipeStream<pipe_mode::Bytes>,
@@ -77,8 +77,7 @@ impl LHMClient {
 
 #[cfg(test)]
 mod test {
-    use crate::LHMClient;
-    use lhm_shared::{ComputerOptions, Hardware, HardwareType, SensorType};
+    use crate::{ComputerOptions, Hardware, HardwareType, LHMClient, SensorType};
 
     #[tokio::test]
     #[ignore = "Requires the service to be running"]

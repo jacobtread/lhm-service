@@ -9,18 +9,26 @@ readme = "README.md"
 description = "Windows service for running LHM and allowing clients to connect to it without requiring admin rights"
 
 [dependencies]
-anyhow = "1.0.98"
-clap = { version = "4.5.38", features = ["derive"] }
+# Error type
+anyhow = "1"
 
-interprocess = { version = "2.2.3", features = ["tokio"] }
-num_enum = "0.7.3"
-serde = { version = "1.0.219", features = ["derive"] }
-serde_json = "1.0.140"
-tokio = { version = "1.45.0", features = ["full"] }
-tracing = { version = "0.1.41", features = ["log"] }
-widestring = "1.2.0"
+# Command line argument parsing
+clap = { version = "4", features = ["derive"] }
+
+interprocess = { workspace = true }
+serde_json = { workspace = true }
+
+# Async runtime 
+tokio = { version = "1", features = ["rt", "sync"] }
+
+# Wide string for creating a security descriptor
+widestring = "1"
+
+# Windows service library
 windows-service = "0.7"
-windows-sys = { version = "0.52", features = ["Win32_Security"] }
 
-lhm-shared = { version = "*", path = "../lhm-shared" }
-lhm-sys = { version = "*", path = "../lhm-sys" }
+# Shared helpers
+lhm-shared = { version = "0.0.0", path = "../lhm-shared" }
+
+# Core library
+lhm-sys = { version = "0.0.0", path = "../lhm-sys" }

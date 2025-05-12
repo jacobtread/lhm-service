@@ -12,7 +12,6 @@ use std::ffi::OsString;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::task::LocalSet;
-use tracing::debug;
 use windows_service::service::{
     ServiceAccess, ServiceControl, ServiceControlAccept, ServiceErrorControl, ServiceExitCode,
     ServiceInfo, ServiceStartType, ServiceState, ServiceStatus, ServiceType,
@@ -71,7 +70,7 @@ pub fn restart_service() -> anyhow::Result<()> {
 
 /// Creates a new windows service for the oguard exe using sc.exe
 pub fn create_service() -> anyhow::Result<()> {
-    debug!("creating service");
+    println!("creating service");
 
     // Get the path to the executable
     let executable_path = env::current_exe().context("failed to get current executable path")?;
@@ -104,7 +103,7 @@ pub fn create_service() -> anyhow::Result<()> {
 
 /// Starts the windows service
 pub fn start_service() -> anyhow::Result<()> {
-    debug!("starting service");
+    println!("starting service");
 
     let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)
         .context("failed to access service manager")?;
@@ -121,7 +120,7 @@ pub fn start_service() -> anyhow::Result<()> {
 
 /// Stops the windows service
 pub fn stop_service() -> anyhow::Result<()> {
-    debug!("stopping service");
+    println!("stopping service");
 
     let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)
         .context("failed to access service manager")?;
@@ -137,7 +136,7 @@ pub fn stop_service() -> anyhow::Result<()> {
 
 /// Deletes the windows service
 pub fn delete_service() -> anyhow::Result<()> {
-    debug!("deleting service");
+    println!("deleting service");
 
     let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)
         .context("failed to access service manager")?;

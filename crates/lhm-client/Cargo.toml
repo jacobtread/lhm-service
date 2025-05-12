@@ -9,9 +9,13 @@ readme = "README.md"
 description = "Client for using the LHM service"
 
 [dependencies]
-interprocess = { version = "2.2.3", features = ["tokio"] }
-tokio = { version = "1.45.0", features = ["full"] }
-serde = { version = "1.0.219", features = ["derive"] }
-serde_json = "1.0.140"
+interprocess = { workspace = true }
+serde_json = { workspace = true }
 
-lhm-shared = { version = "*", path = "../lhm-shared" }
+tokio = { version = "1", features = [] }
+
+# Shared structures
+lhm-shared = { version = "0.0.0", path = "../lhm-shared" }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros"] }
