@@ -2,8 +2,8 @@ use crate::actor::ComputerActor;
 use interprocess::os::windows::named_pipe::tokio::{DuplexPipeStream, PipeListenerOptionsExt};
 use interprocess::os::windows::named_pipe::{PipeListenerOptions, pipe_mode};
 use interprocess::os::windows::security_descriptor::SecurityDescriptor;
-use lhm_shared::PipeRequest;
 use lhm_shared::PipeResponse;
+use lhm_shared::{PIPE_NAME, PipeRequest};
 use lhm_sys::Bridge;
 use std::io::ErrorKind;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -20,7 +20,7 @@ pub async fn run_server() -> std::io::Result<()> {
         .security_descriptor(Some(SecurityDescriptor::deserialize(
             U16CString::from_str_truncate("D:(A;;GA;;;WD)").as_ucstr(),
         )?))
-        .path(r"\\.\pipe\LHMLibreHardwareMonitorService")
+        .path(PIPE_NAME)
         .create_tokio_duplex::<pipe_mode::Bytes>()?;
 
     loop {

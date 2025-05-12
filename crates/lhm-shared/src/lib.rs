@@ -1,6 +1,8 @@
 use num_enum::TryFromPrimitive;
 use serde::{Deserialize, Serialize};
 
+pub const PIPE_NAME: &str = r"\\.\pipe\LHMLibreHardwareMonitorService";
+
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
 pub struct ComputerOptions {
     pub battery_enabled: bool,

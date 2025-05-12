@@ -1,16 +1,14 @@
 use interprocess::os::windows::named_pipe::{pipe_mode, tokio::DuplexPipeStream};
-use lhm_shared::{Hardware, HardwareType, PipeRequest, PipeResponse, SensorType};
+use lhm_shared::{Hardware, HardwareType, PIPE_NAME, PipeRequest, PipeResponse, SensorType};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 #[tokio::main]
 async fn main() {
     //}
 
-    let mut conn = DuplexPipeStream::<pipe_mode::Bytes>::connect_by_path(
-        r"\\.\pipe\LHMLibreHardwareMonitorService",
-    )
-    .await
-    .unwrap();
+    let mut conn = DuplexPipeStream::<pipe_mode::Bytes>::connect_by_path(PIPE_NAME)
+        .await
+        .unwrap();
 
     send_message(&mut conn, PipeRequest::Update).await;
     send_message(&mut conn, PipeRequest::GetHardware).await;
