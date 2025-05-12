@@ -14,7 +14,7 @@ fn build_library() {
 
     // Path to the bridge and bridge output
     let project_path = manifest_path.join("lhm-bridge");
-    let publish_path = project_path.join("release");
+    let publish_path = out_path.join("lhm-bridge");
 
     // Run the build command
     let status = Command::new("dotnet")
