@@ -1,10 +1,43 @@
 # 🔧 LibreHardwareMonitorService (LHM)
 
-> TLDR: Library to access things like CPU and GPU temperatures in windows without requiring the program to run as 🔐 Administrator. 
+> **TL;DR**: Access CPU/GPU temperatures and other hardware data on Windows *without* needing to run your app as 🔐 Administrator.
 
 The **LibreHardwareMonitorService** (LHM) project allows you to access hardware information, such as CPU and GPU temperatures, on Windows from user-land code using Rust. Typically, user-land programs cannot directly access hardware information due to operating system restrictions, which require administrator privileges for such actions.
 
 This library overcomes this limitation by installing a service that handles hardware information requests. Instead of requiring the program to access hardware directly, it sends requests to this service, which allows the program to run without administrator permissions. The only time administrator privileges are needed is during the installation of the service.
+
+---
+
+## 🧠 How It Works
+1. **Installation:** The user installs the `lhm-service`, which requires administrator permissions to set up.
+2. **Service Communication:** The `lhm-service` runs in the background, waiting for requests from user-land applications.
+3. **Client Requests:** Your program (using `lhm-client`) sends requests to the service through the named pipe. These requests are passed to the Libre Hardware Monitor library to retrieve hardware data.
+4. **Response:** The service responds to the request with the requested hardware data in JSON format, allowing your program to access hardware metrics like temperatures without requiring elevated privileges.
+
+
+```mermaid
+flowchart TD
+    App["🦀 Rust App<br/>(User Mode - No Admin)"]
+    Client["🔌 lhm-client<br/>(Sends JSON Request)"]
+    Pipe["📡 Named Pipe<br/>\\\\.\\pipe\\LHMLibreHardwareMonitorService"]
+    Service["🛎️ lhm-service<br/>(Windows Service)"]
+    FFI["🧩 lhm-sys<br/>(Rust ↔ C# Bridge)"]
+    Monitor["📈 LibreHardwareMonitorLib<br/>(Reads Hardware Data)"]
+
+    App --> Client
+    Client --> Pipe
+    Pipe --> Service
+    Service --> FFI
+    FFI --> Monitor
+
+    Monitor --> FFI
+    FFI --> Service
+    Service --> Pipe
+    Pipe --> Client
+    Client --> App
+```
+
+---
 
 ## Prerequisites
 
@@ -34,33 +67,3 @@ You can download the prebuilt installer from [Releases](https://github.com/jacob
 ### 💬 lhm-client (Client)
 
 The `lhm-client` is the client library that interacts with the named pipe created by `lhm-service`. It allows user-land applications to request hardware details (e.g., CPU/GPU temperatures) via the service using JSON over the named pipe.
-
-## 🧠 How It Works
-1. **Installation:** The user installs the `lhm-service`, which requires administrator permissions to set up.
-2. **Service Communication:** The `lhm-service` runs in the background, waiting for requests from user-land applications.
-3. **Client Requests:** Your program (using `lhm-client`) sends requests to the service through the named pipe. These requests are passed to the Libre Hardware Monitor library to retrieve hardware data.
-4. **Response:** The service responds to the request with the requested hardware data in JSON format, allowing your program to access hardware metrics like temperatures without requiring elevated privileges.
-
-
-```mermaid
-flowchart TD
-    App["🦀 Rust App<br/>(User Mode - No Admin)"]
-    Client["🔌 lhm-client<br/>(Sends JSON Request)"]
-    Pipe["📡 Named Pipe<br/>\\\\.\\pipe\\LHMLibreHardwareMonitorService"]
-    Service["🛎️ lhm-service<br/>(Windows Service)"]
-    FFI["🧩 lhm-sys<br/>(Rust ↔ C# Bridge)"]
-    Monitor["📈 LibreHardwareMonitorLib<br/>(Reads Hardware Data)"]
-
-    App --> Client
-    Client --> Pipe
-    Pipe --> Service
-    Service --> FFI
-    FFI --> Monitor
-
-    Monitor --> FFI
-    FFI --> Service
-    Service --> Pipe
-    Pipe --> Client
-    Client --> App
-````
-
