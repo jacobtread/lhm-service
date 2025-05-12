@@ -26,6 +26,7 @@ fn build_library() {
         .arg("win-x64")
         .arg("/p:SelfContained=true")
         .arg("/p:PublishAot=true")
+        .arg(format!("/p:OutputPath={}/", publish_path.display()))
         .arg(format!(
             "/p:BaseIntermediateOutputPath={}/",
             intermediate_path.display()
