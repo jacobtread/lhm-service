@@ -1,6 +1,7 @@
 use std::{
     ffi::{CStr, c_char, c_void},
     marker::PhantomData,
+    path::Path,
     ptr::null,
     rc::Rc,
 };
@@ -45,10 +46,18 @@ pub struct Bridge {
     inner: Rc<Container<BridgeApi>>,
 }
 
+const EMBEDDED_DLL: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/lhm-bridge.dll"));
+const DLL_NAME: &str = "lhm-bridge.dll";
+
 impl Bridge {
     pub fn init() -> Self {
-        let container: Container<BridgeApi> = unsafe { Container::load("lhm-bridge.dll") }
-            .expect("Could not open library or load symbols");
+        let dll_path = Path::new(DLL_NAME);
+        if !dll_path.exists() {
+            std::fs::write(dll_path, EMBEDDED_DLL).expect("failed to write embedded dll");
+        }
+
+        let container: Container<BridgeApi> =
+            unsafe { Container::load(DLL_NAME) }.expect("Could not open library or load symbols");
         Self {
             inner: Rc::new(container),
         }

@@ -6,20 +6,11 @@ fn main() {
 
 fn build_library() {
     let manifest_path = env::var("CARGO_MANIFEST_DIR").expect("failed to get manifest directory");
-    let profile = env::var("PROFILE").unwrap();
+    let out_path = env::var("OUT_DIR").unwrap();
 
     // Get the library folder
     let manifest_path = Path::new(&manifest_path);
-
-    // Get the workspace folder
-    let workspace_root = manifest_path
-        .parent()
-        .expect("missing crates path")
-        .parent()
-        .expect("missing workspace root");
-
-    // Get the build output directory
-    let out_path = workspace_root.join("target").join(profile);
+    let out_path = Path::new(&out_path);
 
     // Path to the bridge and bridge output
     let project_path = manifest_path.join("lhm-bridge");

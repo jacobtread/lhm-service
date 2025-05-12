@@ -1,3 +1,8 @@
 [workspace]
 resolver = "2"
-members = ["crates/lhm-shared", "crates/lhm-service", "crates/lhm-client"]
+members = [
+    "crates/lhm-shared",
+    "crates/lhm-service",
+    "crates/lhm-client",
+    "crates/lhm-sys",
+]

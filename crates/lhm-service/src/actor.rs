@@ -1,7 +1,7 @@
 use lhm_shared::Hardware;
 use tokio::sync::{mpsc, oneshot};
 
-use crate::{Bridge, Computer};
+use lhm_sys::{Bridge, Computer};
 
 pub struct ComputerActor {}
 

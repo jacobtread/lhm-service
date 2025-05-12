@@ -277,10 +277,9 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "clap",
- "dlopen",
- "dlopen_derive",
  "interprocess",
  "lhm-shared",
+ "lhm-sys",
  "num_enum",
  "serde",
  "serde_json",
@@ -298,6 +297,17 @@ dependencies = [
  "num_enum",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "lhm-sys"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "dlopen",
+ "dlopen_derive",
+ "lhm-shared",
+ "num_enum",
 ]
 
 [[package]]

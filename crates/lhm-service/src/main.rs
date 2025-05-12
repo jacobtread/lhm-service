@@ -1,15 +1,9 @@
 use anyhow::Context;
 use clap::{Parser, Subcommand};
 
-#[macro_use]
-extern crate dlopen_derive;
-
 mod actor;
-mod ffi;
 mod server;
 mod service;
-
-pub use ffi::{Bridge, Computer};
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
