@@ -1,7 +1,12 @@
 [package]
 name = "lhm-client"
-version = "0.1.0"
+version = "0.0.0"
 edition = "2024"
+license = "MIT"
+authors = ["Jacobtread <jacobtread@gmail.com>"]
+repository = "https://github.com/jacobtread/lhm-service"
+readme = "README.md"
+description = "Client for using the LHM service"
 
 [dependencies]
 interprocess = { version = "2.2.3", features = ["tokio"] }
