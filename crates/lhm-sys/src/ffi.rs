@@ -1,3 +1,6 @@
+use dlopen::wrapper::{Container, WrapperApi};
+use lhm_shared::{Hardware, HardwareType, Sensor, SensorType};
+use num_enum::TryFromPrimitive;
 use std::{
     ffi::{CStr, c_char, c_void},
     marker::PhantomData,
@@ -5,10 +8,6 @@ use std::{
     ptr::null,
     rc::Rc,
 };
-
-use dlopen::wrapper::{Container, WrapperApi};
-use lhm_shared::{Hardware, HardwareType, Sensor, SensorType};
-use num_enum::TryFromPrimitive;
 
 #[repr(C)]
 struct RArray<T> {
@@ -33,7 +32,7 @@ struct CSensor {
 }
 
 #[derive(WrapperApi)]
-struct BridgeApi {
+pub(crate) struct BridgeApi {
     create_computer_instance: unsafe extern "C" fn() -> *const c_void,
     free_computer_instance: unsafe extern "C" fn(instance: *const c_void),
     update_computer_instance: unsafe extern "C" fn(instance: *const c_void),
@@ -41,46 +40,43 @@ struct BridgeApi {
     free_hardware_array: unsafe extern "C" fn(hardware_array: RArray<CHardware>),
 }
 
-#[derive(Clone)]
-pub struct Bridge {
-    inner: Rc<Container<BridgeApi>>,
-}
-
 const EMBEDDED_DLL: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/lhm-bridge.dll"));
 const DLL_NAME: &str = "lhm-bridge.dll";
 
-impl Bridge {
-    pub fn init() -> Self {
-        let dll_path = Path::new(DLL_NAME);
-        if !dll_path.exists() {
-            std::fs::write(dll_path, EMBEDDED_DLL).expect("failed to write embedded dll");
-        }
-
-        let container: Container<BridgeApi> =
-            unsafe { Container::load(DLL_NAME) }.expect("Could not open library or load symbols");
-        Self {
-            inner: Rc::new(container),
-        }
+/// Initialize the lhm-bridge.dll ensuring that the file exists
+fn init_bridge_dll() {
+    let dll_path = Path::new(DLL_NAME);
+    if !dll_path.exists() {
+        std::fs::write(dll_path, EMBEDDED_DLL).expect("failed to write embedded dll");
     }
 }
 
-pub struct Computer {
-    bridge: Rc<Container<BridgeApi>>,
+/// Loads the bridge DLL
+pub(crate) fn load_bridge_dll() -> Result<BridgeContainer, dlopen::Error> {
+    // Ensure DLL exists
+    init_bridge_dll();
+
+    // Load the DLL container
+    unsafe { Container::load(DLL_NAME) }
+}
+
+pub(crate) type BridgeContainer = Container<BridgeApi>;
+pub(crate) type SharedBridgeContainer = Rc<BridgeContainer>;
+
+pub struct ComputerInstance {
+    bridge: SharedBridgeContainer,
     instance: *const c_void,
 }
 
-impl Computer {
-    pub fn create(bridge: &Bridge) -> Self {
-        let instance = unsafe { bridge.inner.create_computer_instance() };
+impl ComputerInstance {
+    pub fn create(bridge: SharedBridgeContainer) -> Self {
+        let instance = unsafe { bridge.create_computer_instance() };
 
         if instance.is_null() {
             panic!("failed to create instance")
         }
 
-        Self {
-            bridge: bridge.inner.clone(),
-            instance,
-        }
+        Self { bridge, instance }
     }
 
     pub fn update(&mut self) {
@@ -105,7 +101,7 @@ impl Computer {
     }
 }
 
-impl Drop for Computer {
+impl Drop for ComputerInstance {
     fn drop(&mut self) {
         unsafe {
             self.bridge.free_computer_instance(self.instance);
