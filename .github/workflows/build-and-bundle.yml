@@ -1,0 +1,61 @@
+name: Cross-Compile and Bundle Plugin
+
+on:
+  # Trigger when a tag is pushed for a release
+  push:
+    tags:
+      - "*.*.*" # This will trigger when a tag like v1.0.0 is pushed
+  # Manual trigger for creating an artifact (button in the UI)
+  workflow_dispatch:
+
+permissions:
+  packages: write
+  contents: write
+
+jobs:
+  build:
+    name: Build service
+    runs-on: windows-latest
+    steps:
+      # Checkout the repo for building
+      - uses: actions/checkout@v4
+
+      # Setup rust for building the service
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          override: true
+
+      # Set up .NET for building the C# binding
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+
+      # Build the binary
+      - name: Build for ${{ matrix.target }}
+        run: cargo build -p lhm-service --release
+      - name: Copy binary to output
+        run: |
+          mkdir output
+          cp target/release/lhm-service.exe output/lhm-service.exe
+        shell: bash
+
+      # Build the setup installer for the service
+      - name: Compile .ISS to .EXE Installer
+        uses: Minionguyjpro/Inno-Setup-Action@v1.0.0
+        with:
+          path: lhm-service.iss
+          options: /O+
+
+      # Upload a release when a tag was created
+      - name: Upload binary to release
+        uses: softprops/action-gh-release@v2
+        if: github.event_name == 'push'
+        with:
+          draft: true
+          files: lhm-setup.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
