@@ -1,45 +1,10 @@
 use anyhow::Context;
-use clap::{Parser, Subcommand};
 
 mod actor;
 mod server;
 mod service;
 
-#[derive(Parser)]
-#[command(version, about, long_about = None)]
-struct Cli {
-    #[command(subcommand)]
-    command: Option<Commands>,
-}
-
-#[derive(Subcommand)]
-enum Commands {
-    /// Create the service (Will fail if the service is already created)
-    Create,
-    /// Start the service
-    Start,
-    /// Stop the service
-    Stop,
-    /// Restart the service
-    Restart,
-    /// Delete the service
-    Delete,
-}
-
 fn main() -> anyhow::Result<()> {
-    // Parse command line arguments
-    let cli = Cli::parse();
-
-    if let Some(command) = cli.command {
-        return match command {
-            Commands::Create => service::create_service(),
-            Commands::Start => service::start_service(),
-            Commands::Stop => service::stop_service(),
-            Commands::Restart => service::restart_service(),
-            Commands::Delete => service::delete_service(),
-        };
-    }
-
     windows_service::service_dispatcher::start(service::SERVICE_NAME, ffi_service_main)
         .context("failed to start service")?;
 

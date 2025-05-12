@@ -34,6 +34,12 @@ jobs:
           dotnet-version: |
             8.0.x
 
+      - name: Install WiX
+        run: dotnet tool install --global wix
+
+      - name: Install WiX UI Extension
+        run: wix extension add -g WixToolset.UI.wixext
+
       # Build the binary
       - name: Build for ${{ matrix.target }}
         run: cargo build -p lhm-service --release
@@ -44,11 +50,8 @@ jobs:
         shell: bash
 
       # Build the setup installer for the service
-      - name: Compile .ISS to .EXE Installer
-        uses: Minionguyjpro/Inno-Setup-Action@v1.0.0
-        with:
-          path: lhm-service.iss
-          options: /O+
+      - name: Create WiX installer
+        run: wix build lhm-service.wxs -ext WixToolset.UI.wixext -loc lhm-service.en-us.wxl
 
       # Upload a release when a tag was created
       - name: Upload binary to release
@@ -56,6 +59,6 @@ jobs:
         if: github.event_name == 'push'
         with:
           draft: true
-          files: lhm-setup.exe
+          files: lhm-setup.msi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

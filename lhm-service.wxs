@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"  xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui" >
+  <Package Name="Hardware Monitoring Service"
+           Version="0.0.0"
+           Manufacturer="Jacobtread"
+           InstallerVersion="500"
+           Compressed="yes">
+    
+    <!-- UpgradeCode="b1497e81-f922-4f2a-9537-ccc2c0d28f2c" <MajorUpgrade DowngradeErrorMessage="A newer version is already installed." /> -->
+    <MediaTemplate EmbedCab="yes" />
+
+    <Feature Id="ProductFeature" Title="Hardware Monitoring Service" Level="1">
+    </Feature>
+
+    <StandardDirectory Id="ProgramFilesFolder">
+      <Directory Id="INSTALLDIR" Name="LibreHardwareMonitorService">
+        <Component Id="ServiceExe" Feature="ProductFeature">
+          <!-- Service executable file -->
+          <File Id="lhmServiceExe" Source=".\target\release\lhm-service.exe" KeyPath="yes" />
+          
+          <!-- Setup service installation -->
+          <ServiceInstall Id="LHMServiceInstall"
+                          Name="LibreHardwareMonitorService"
+                          DisplayName="Libre Hardware Monitor Service"
+                          Description="Monitors hardware sensors and provides data"
+                          Start="auto"
+                          Type="ownProcess"
+                          ErrorControl="normal" />
+
+          <!-- Setup service control -->
+          <ServiceControl Id="LHMServiceControl"
+                          Name="LibreHardwareMonitorService"
+                          Start="install"
+                          Stop="both"
+                          Remove="uninstall"
+                          Wait="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <WixVariable Id="WixUILicenseRtf" Value="./LICENSE.rtf" />
+
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLDIR"/>
+    <ui:WixUI Id="WixUI_InstallDir" />
+  </Package>
+</Wix>
