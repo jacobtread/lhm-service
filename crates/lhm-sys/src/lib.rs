@@ -44,9 +44,9 @@ pub struct Computer {
 }
 
 impl Computer {
-    pub fn create(bridge: &Bridge, options: ComputerOptions) -> Self {
-        let instance = ComputerInstance::create(bridge.inner.clone(), options.into());
-        Self { instance }
+    pub fn create(bridge: &Bridge, options: ComputerOptions) -> std::io::Result<Self> {
+        let instance = ComputerInstance::create(bridge.inner.clone(), options.into())?;
+        Ok(Self { instance })
     }
 
     pub fn update(&mut self) {

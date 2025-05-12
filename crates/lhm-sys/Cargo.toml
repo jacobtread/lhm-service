@@ -9,10 +9,6 @@ readme = "README.md"
 description = "Wrapper around Libre Hardware Monitor to request hardware (and temperatures)"
 
 [dependencies]
-anyhow = "1"
-
 dlopen = "0.1"
 dlopen_derive = "0.1.4"
-
 lhm-shared = { version = "0.0.0", path = "../lhm-shared" }
-thiserror = "2.0.12"

@@ -101,14 +101,20 @@ pub struct ComputerInstance {
 }
 
 impl ComputerInstance {
-    pub fn create(bridge: SharedBridgeContainer, options: RComputerOptions) -> Self {
+    pub fn create(
+        bridge: SharedBridgeContainer,
+        options: RComputerOptions,
+    ) -> std::io::Result<Self> {
         let instance = unsafe { bridge.create_computer_instance(options) };
 
         if instance.is_null() {
-            panic!("failed to create instance")
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "failed to create computer instance",
+            ));
         }
 
-        Self { bridge, instance }
+        Ok(Self { bridge, instance })
     }
 
     pub fn update(&mut self) {

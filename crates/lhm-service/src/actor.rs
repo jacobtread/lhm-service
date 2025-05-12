@@ -52,7 +52,13 @@ impl ComputerActor {
 
         std::thread::spawn(move || {
             // Run service
-            let mut computer = Computer::create(&bridge, options);
+            let mut computer = match Computer::create(&bridge, options) {
+                Ok(value) => value,
+                Err(err) => {
+                    eprintln!("failed to start computer service: {err}");
+                    return;
+                }
+            };
 
             while let Some(msg) = rx.blocking_recv() {
                 match msg {
