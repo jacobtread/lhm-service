@@ -307,7 +307,6 @@ dependencies = [
  "dlopen",
  "dlopen_derive",
  "lhm-shared",
- "num_enum",
 ]
 
 [[package]]

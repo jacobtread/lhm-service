@@ -1,6 +1,5 @@
 use dlopen::wrapper::{Container, WrapperApi};
 use lhm_shared::{Hardware, HardwareType, Sensor, SensorType};
-use num_enum::TryFromPrimitive;
 use std::{
     ffi::{CStr, c_char, c_void},
     marker::PhantomData,
@@ -162,7 +161,7 @@ fn copy_hardware_safe(hardware: &RArray<CHardware>) -> anyhow::Result<Vec<Hardwa
         let name = unsafe { CStr::from_ptr(item.name) };
         let name = name.to_string_lossy().into_owned();
 
-        let ty = HardwareType::try_from_primitive(item.ty)?;
+        let ty = HardwareType::try_from(item.ty)?;
         let children = copy_hardware_safe(&item.children)?;
         let sensors = copy_sensors_safe(&item.sensors)?;
 
@@ -188,7 +187,7 @@ fn copy_sensors_safe(sensors: &RArray<CSensor>) -> anyhow::Result<Vec<Sensor>> {
     for item in sensors_slice {
         let name = unsafe { CStr::from_ptr(item.name) };
         let name = name.to_string_lossy().into_owned();
-        let ty = SensorType::try_from_primitive(item.ty)?;
+        let ty = SensorType::try_from(item.ty)?;
 
         sensors.push(Sensor {
             name,

@@ -6,7 +6,7 @@ fn main() {
 
 fn build_library() {
     let manifest_path = env::var("CARGO_MANIFEST_DIR").expect("failed to get manifest directory");
-    let out_path = env::var("OUT_DIR").unwrap();
+    let out_path = env::var("OUT_DIR").expect("missing OUT_DIR");
 
     // Get the library folder
     let manifest_path = Path::new(&manifest_path);
