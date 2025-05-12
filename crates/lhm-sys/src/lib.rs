@@ -3,6 +3,13 @@
 //! System library for working with Libre Hardware Monitor from rust, specifically creating a
 //! computer instance, updating it and requesting the list of hardware and sensors from Rust
 //!
+//! Requires .NET SDK 8.0
+//!
+//! You can install this through winget using:
+//! ```
+//! winget install Microsoft.DotNet.SDK.8
+//!```
+//!
 
 #[macro_use]
 extern crate dlopen_derive;

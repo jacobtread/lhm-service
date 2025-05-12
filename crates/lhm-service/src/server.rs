@@ -36,31 +36,79 @@ pub async fn handle_pipe_stream(bridge: Bridge, mut stream: DuplexPipeStream<pip
     loop {
         let request: PipeRequest = match recv_message(&mut stream).await {
             Ok(value) => value,
-            Err(_) => return,
+            Err(err) => {
+                let error = err.to_string();
+                return {
+                    if send_message(&mut stream, PipeResponse::Error { error })
+                        .await
+                        .is_err()
+                    {
+                        return;
+                    }
+                };
+            }
         };
 
         match request {
-            PipeRequest::Update => {
-                if handle.update().await.is_err() {
-                    return;
+            PipeRequest::Update => match handle.update().await {
+                Ok(_) => {
+                    if send_message(&mut stream, PipeResponse::Updated)
+                        .await
+                        .is_err()
+                    {
+                        return;
+                    }
                 }
-            }
+                Err(err) => {
+                    let error = err.to_string();
+                    if send_message(&mut stream, PipeResponse::Error { error })
+                        .await
+                        .is_err()
+                    {
+                        return;
+                    }
+                }
+            },
             PipeRequest::GetHardware => {
-                let hardware = match handle.get_hardware().await {
-                    Ok(value) => value,
-                    Err(_) => return,
+                match handle.get_hardware().await {
+                    Ok(hardware) => {
+                        if send_message(&mut stream, PipeResponse::Hardware { hardware })
+                            .await
+                            .is_err()
+                        {
+                            return;
+                        }
+                    }
+                    Err(err) => {
+                        let error = err.to_string();
+                        if send_message(&mut stream, PipeResponse::Error { error })
+                            .await
+                            .is_err()
+                        {
+                            return;
+                        }
+                    }
                 };
-                let response = PipeResponse::Hardware { hardware };
-
-                if send_message(&mut stream, response).await.is_err() {
-                    return;
-                }
             }
-            PipeRequest::SetOptions { options } => {
-                if handle.set_options(options).await.is_err() {
-                    return;
+            PipeRequest::SetOptions { options } => match handle.set_options(options).await {
+                Ok(_) => {
+                    if send_message(&mut stream, PipeResponse::UpdatedOptions)
+                        .await
+                        .is_err()
+                    {
+                        return;
+                    }
                 }
-            }
+                Err(err) => {
+                    let error = err.to_string();
+                    if send_message(&mut stream, PipeResponse::Error { error })
+                        .await
+                        .is_err()
+                    {
+                        return;
+                    }
+                }
+            },
         }
     }
 }

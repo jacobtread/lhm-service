@@ -28,6 +28,9 @@ pub enum PipeRequest {
 #[serde(tag = "type")]
 pub enum PipeResponse {
     Hardware { hardware: Vec<Hardware> },
+    Updated,
+    UpdatedOptions,
+    Error { error: String },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
