@@ -1,4 +1,4 @@
-use num_enum::TryFromPrimitive;
+use num_enum::{FromPrimitive, IntoPrimitive};
 use serde::{Deserialize, Serialize};
 
 pub const PIPE_NAME: &str = r"\\.\pipe\LHMLibreHardwareMonitorService";
@@ -64,7 +64,17 @@ pub struct Sensor {
 
 /// Types of hardware
 #[derive(
-    Debug, Clone, Copy, TryFromPrimitive, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord,
+    Debug,
+    Clone,
+    Copy,
+    FromPrimitive,
+    IntoPrimitive,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
 )]
 #[repr(u32)]
 pub enum HardwareType {
@@ -81,11 +91,23 @@ pub enum HardwareType {
     EmbeddedController,
     Psu,
     Battery,
+    #[num_enum(catch_all)]
+    Unknown(u32),
 }
 
 /// Types of sensors
 #[derive(
-    Debug, Clone, Copy, TryFromPrimitive, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord,
+    Debug,
+    Clone,
+    Copy,
+    FromPrimitive,
+    IntoPrimitive,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
 )]
 #[repr(u32)]
 pub enum SensorType {
@@ -109,4 +131,6 @@ pub enum SensorType {
     Noise,
     Conductivity,
     Humidity,
+    #[num_enum(catch_all)]
+    Unknown(u32),
 }

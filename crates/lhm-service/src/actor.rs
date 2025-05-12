@@ -27,7 +27,7 @@ impl ComputerActorHandle {
     pub async fn get_hardware(&self) -> anyhow::Result<Vec<Hardware>> {
         let (tx, rx) = oneshot::channel();
         self.tx.send(ComputerActorMessage::GetHardware { tx })?;
-        let value = rx.await??;
+        let value = rx.await?;
         Ok(value)
     }
 }
@@ -42,7 +42,7 @@ pub enum ComputerActorMessage {
         tx: oneshot::Sender<()>,
     },
     GetHardware {
-        tx: oneshot::Sender<anyhow::Result<Vec<Hardware>>>,
+        tx: oneshot::Sender<Vec<Hardware>>,
     },
 }
 

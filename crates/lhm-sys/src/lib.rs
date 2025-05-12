@@ -57,7 +57,7 @@ impl Computer {
         self.instance.update_options(options.into());
     }
 
-    pub fn get_hardware(&mut self) -> anyhow::Result<Vec<Hardware>> {
+    pub fn get_hardware(&mut self) -> Vec<Hardware> {
         self.instance.get_hardware()
     }
 }
