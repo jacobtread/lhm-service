@@ -14,6 +14,7 @@ fn build_library() {
 
     // Path to the bridge and bridge output
     let project_path = manifest_path.join("lhm-bridge");
+    let intermediate_path = out_path.join("lhm-bridge-build");
     let publish_path = out_path.join("lhm-bridge");
 
     // Run the build command
@@ -25,6 +26,10 @@ fn build_library() {
         .arg("win-x64")
         .arg("/p:SelfContained=true")
         .arg("/p:PublishAot=true")
+        .arg(format!(
+            "/p:BaseIntermediateOutputPath={}/",
+            intermediate_path.display()
+        ))
         .arg("--output")
         .arg(&publish_path)
         .arg(&project_path)
