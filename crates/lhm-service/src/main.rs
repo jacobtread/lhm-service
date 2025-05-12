@@ -1,90 +1,15 @@
 use anyhow::Context;
 use clap::{Parser, Subcommand};
-use num_enum::TryFromPrimitive;
 
 #[macro_use]
 extern crate dlopen_derive;
 
 mod actor;
 mod ffi;
+mod server;
 mod service;
 
 pub use ffi::{Bridge, Computer};
-use serde::Serialize;
-
-#[derive(Debug, Clone, Serialize)]
-pub struct Hardware {
-    /// Name of the hardware
-    pub name: String,
-
-    /// Type of hardware
-    pub ty: HardwareType,
-
-    /// Children for the hardware
-    pub children: Vec<Hardware>,
-
-    /// Sensors attached to the hardware
-    pub sensors: Vec<Sensor>,
-}
-
-/// Instance of a sensor
-#[derive(Debug, Clone, Serialize)]
-pub struct Sensor {
-    /// Name of the sensor
-    pub name: String,
-
-    /// Type of the sensor
-    pub ty: SensorType,
-
-    /// Value of the sensor will be NaN when the sensor
-    /// has no value
-    pub value: f32,
-}
-
-/// Types of hardware
-#[derive(Debug, Clone, Copy, TryFromPrimitive, Serialize)]
-#[repr(u32)]
-pub enum HardwareType {
-    Motherboard,
-    SuperIO,
-    Cpu,
-    Memory,
-    GpuNvidia,
-    GpuAmd,
-    GpuIntel,
-    Storage,
-    Network,
-    Cooler,
-    EmbeddedController,
-    Psu,
-    Battery,
-}
-
-/// Types of sensors
-#[derive(Debug, Clone, Copy, TryFromPrimitive, Serialize)]
-#[repr(u32)]
-pub enum SensorType {
-    Voltage,
-    Current,
-    Power,
-    Clock,
-    Temperature,
-    Load,
-    Frequency,
-    Fan,
-    Flow,
-    Control,
-    Level,
-    Factor,
-    Data,
-    SmallData,
-    Throughput,
-    TimeSpan,
-    Energy,
-    Noise,
-    Conductivity,
-    Humidity,
-}
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]

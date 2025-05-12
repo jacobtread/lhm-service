@@ -5,13 +5,23 @@ fn main() {
 }
 
 fn build_library() {
-    // Get the location of the cargo toml
-    let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("failed to get manifest directory");
-    let manifest_path = Path::new(&manifest_dir);
-    let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+    let manifest_path = env::var("CARGO_MANIFEST_DIR").expect("failed to get manifest directory");
     let profile = env::var("PROFILE").unwrap();
-    let out_dir = format!("{}/target/{}", crate_dir, profile);
-    let out_path = Path::new(&out_dir);
+
+    // Get the library folder
+    let manifest_path = Path::new(&manifest_path);
+
+    // Get the workspace folder
+    let workspace_root = manifest_path
+        .parent()
+        .expect("missing crates path")
+        .parent()
+        .expect("missing workspace root");
+
+    // Get the build output directory
+    let out_path = workspace_root.join("target").join(profile);
+
+    // Path to the bridge and bridge output
     let project_path = manifest_path.join("lhm-bridge");
     let publish_path = project_path.join("release");
 
@@ -36,15 +46,17 @@ fn build_library() {
 
     println!("built binding library");
 
+    // Get the built DLL
     let output_file = publish_path.join("lhm-bridge.dll");
 
-    if output_file.exists() {
-        // copy dll to output directory
-        fs::copy(output_file, out_path.join("lhm-bridge.dll"))
-            .expect("Failed to copy .dll to Rust target directory");
-    } else {
+    // Check the build output dll exists
+    if !output_file.exists() {
         panic!("build output not found");
     }
+
+    // Copy dll to output directory
+    fs::copy(output_file, out_path.join("lhm-bridge.dll"))
+        .expect("Failed to copy .dll to Rust target directory");
 
     // Re-run build script if the bridge code changes
     println!(

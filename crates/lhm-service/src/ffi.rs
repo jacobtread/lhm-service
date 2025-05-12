@@ -6,9 +6,8 @@ use std::{
 };
 
 use dlopen::wrapper::{Container, WrapperApi};
+use lhm_shared::{Hardware, HardwareType, Sensor, SensorType};
 use num_enum::TryFromPrimitive;
-
-use crate::{Hardware, HardwareType, Sensor, SensorType};
 
 #[repr(C)]
 struct RArray<T> {

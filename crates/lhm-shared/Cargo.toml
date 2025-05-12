@@ -1,0 +1,14 @@
+[package]
+name = "lhm-shared"
+version = "0.0.0"
+edition = "2024"
+license = "MIT"
+authors = ["Jacobtread <jacobtread@gmail.com>"]
+repository = "https://github.com/jacobtread/lhm"
+readme = "README.md"
+description = "Wrapper around Libre Hardware Monitor to request hardware (and temperatures)"
+
+[dependencies]
+num_enum = "0.7.3"
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
