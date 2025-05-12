@@ -40,7 +40,7 @@ impl ComputerActor {
 
         std::thread::spawn(move || {
             // Run service
-            let bridge = Bridge::init();
+            let bridge = Bridge::load().unwrap();
             let mut computer = Computer::create(&bridge);
 
             // Perform initial update
