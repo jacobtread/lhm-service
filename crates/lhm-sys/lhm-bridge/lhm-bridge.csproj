@@ -14,5 +14,4 @@
   <ItemGroup>
     <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.4" />
   </ItemGroup>
-
 </Project>

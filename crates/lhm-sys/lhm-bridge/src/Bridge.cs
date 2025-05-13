@@ -4,9 +4,6 @@ using System;
 using System.Runtime.InteropServices;
 using LibreHardwareMonitor.Hardware;
 using System.Runtime.CompilerServices;
-using System.Diagnostics;
-using System.Reflection.Metadata;
-using static lhwm_bridge.Exported;
 using System.Collections.Generic;
 
 public static class Exported
@@ -47,7 +44,7 @@ public static class Exported
                 IsMotherboardEnabled = options.motherboard_enabled,
                 IsNetworkEnabled = options.network_enabled,
                 IsPsuEnabled = options.psu_enabled,
-                IsStorageEnabled = options.storage_enabled, 
+                IsStorageEnabled = options.storage_enabled,
             };
 
             computer.Open();
