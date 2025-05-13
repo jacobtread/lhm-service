@@ -12,4 +12,3 @@ description = "Shared structures used between lhm-client, lhm-service, and lhm-s
 num_enum = "0.7.3"
 
 serde = { workspace = true }
-serde_json = { workspace = true }
