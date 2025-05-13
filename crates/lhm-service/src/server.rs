@@ -118,8 +118,8 @@ async fn send_message(
     request: PipeResponse,
 ) -> std::io::Result<()> {
     let data_bytes =
-        serde_json::to_vec(&request).map_err(|err| std::io::Error::new(ErrorKind::Other, err))?;
-    let length = data_bytes.len() as u32;
+        rmp_serde::to_vec(&request).map_err(|err| std::io::Error::new(ErrorKind::Other, err))?;
+    let length: u32 = data_bytes.len() as u32;
     let length_bytes = length.to_be_bytes();
 
     // Write the length
@@ -146,7 +146,7 @@ async fn recv_message(
     let mut data_buffer = vec![0u8; length];
     stream.read_exact(&mut data_buffer).await?;
 
-    let response: PipeRequest = serde_json::from_slice(&data_buffer)
+    let response: PipeRequest = rmp_serde::from_slice(&data_buffer)
         .map_err(|err| std::io::Error::new(ErrorKind::Other, err))?;
     Ok(response)
 }

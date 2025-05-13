@@ -16,7 +16,7 @@ anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 
 interprocess = { workspace = true }
-serde_json = { workspace = true }
+rmp-serde = { workspace = true }
 
 # Async runtime 
 tokio = { version = "1", features = ["rt", "sync"] }

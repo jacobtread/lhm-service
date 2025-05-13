@@ -10,12 +10,12 @@ description = "Client for using the LHM service"
 
 [dependencies]
 interprocess = { workspace = true }
-serde_json = { workspace = true }
 
 tokio = { version = "1", features = [] }
 
 # Shared structures
 lhm-shared = { version = "0.0.0", path = "../lhm-shared" }
+rmp-serde.workspace = true
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros"] }

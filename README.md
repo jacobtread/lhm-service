@@ -12,13 +12,13 @@ This library overcomes this limitation by installing a service that handles hard
 1. **Installation:** The user installs the `lhm-service`, which requires administrator permissions to set up.
 2. **Service Communication:** The `lhm-service` runs in the background, waiting for requests from user-land applications.
 3. **Client Requests:** Your program (using `lhm-client`) sends requests to the service through the named pipe. These requests are passed to the Libre Hardware Monitor library to retrieve hardware data.
-4. **Response:** The service responds to the request with the requested hardware data in JSON format, allowing your program to access hardware metrics like temperatures without requiring elevated privileges.
+4. **Response:** The service responds to the request with the requested hardware data in [MsgPack](https://msgpack.org/) format, allowing your program to access hardware metrics like temperatures without requiring elevated privileges.
 
 
 ```mermaid
 flowchart TD
     App["🦀 Rust App<br/>(User Mode - No Admin)"]
-    Client["🔌 lhm-client<br/>(Sends JSON Request)"]
+    Client["🔌 lhm-client<br/>(Sends MsgPack Request)"]
     Pipe["📡 Named Pipe<br/>\\\\.\\pipe\\LHMLibreHardwareMonitorService"]
     Service["🛎️ lhm-service<br/>(Windows Service)"]
     FFI["🧩 lhm-sys<br/>(Rust ↔ C# Bridge)"]
@@ -56,7 +56,7 @@ The `lhm-sys` crate serves as a bridge that connects AOT-compiled Rust code to C
 
 ### 🛎️ lhm-service (Service)
 
-The `lhm-service` is a small Windows service that runs in the background. It creates a named pipe (`\\.\pipe\LHMLibreHardwareMonitorService`) for communication with user-land applications. The service interacts with Libre Hardware Monitor, providing hardware details to the client over this pipe via JSON.
+The `lhm-service` is a small Windows service that runs in the background. It creates a named pipe (`\\.\pipe\LHMLibreHardwareMonitorService`) for communication with user-land applications. The service interacts with Libre Hardware Monitor, providing hardware details to the client over this pipe via MsgPack.
 
 - **Pre-built installer:** The lhm-service is provided as a pre-built installer through GitHub releases (automatically built by GitHub Actions).
 - As a consumer of the lhm-client library, you will likely want to bundle this installer with your application or direct users to install it manually.
@@ -66,4 +66,4 @@ You can download the prebuilt installer from [Releases](https://github.com/jacob
 
 ### 💬 lhm-client (Client)
 
-The `lhm-client` is the client library that interacts with the named pipe created by `lhm-service`. It allows user-land applications to request hardware details (e.g., CPU/GPU temperatures) via the service using JSON over the named pipe.
+The `lhm-client` is the client library that interacts with the named pipe created by `lhm-service`. It allows user-land applications to request hardware details (e.g., CPU/GPU temperatures) via the service using MsgPack over the named pipe.
