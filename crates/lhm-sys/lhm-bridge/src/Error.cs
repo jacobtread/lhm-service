@@ -1,23 +1,24 @@
+namespace lhwm_bridge;
 
 // Define layout as explicit for union-like behavior
 using System.Runtime.InteropServices;
 
 [StructLayout(LayoutKind.Explicit)]
-public struct ResultUnion<O, E>
+public struct ComputerResultUnion
 {
     [FieldOffset(0)]
-    public O OkValue;
+    public ComputerPtr OkValue;
 
     [FieldOffset(0)]
-    public E ErrValue;
+    public Utf8Ptr ErrValue;
 }
 
 [StructLayout(LayoutKind.Sequential)]
-public struct Result<O, E>
+public struct ComputerResult
 {
     public bool IsOk; // 1 for Ok, 0 for Err
-    public ResultUnion<O, E> Data;
+    public ComputerResultUnion Data;
 
-    public static Result<O, E> Success(O value) => new() { IsOk = true, Data = new ResultUnion<O, E> { OkValue = value } };
-    public static Result<O, E> Error(E err) => new() { IsOk = false, Data = new ResultUnion<O, E> { OkValue = err } };
+    public static ComputerResult Success(ComputerPtr value) => new() { IsOk = true, Data = new ComputerResultUnion { OkValue = value } };
+    public static ComputerResult Error(Utf8Ptr err) => new() { IsOk = false, Data = new ComputerResultUnion { ErrValue = err } };
 }

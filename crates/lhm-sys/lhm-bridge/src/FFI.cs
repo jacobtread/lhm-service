@@ -1,8 +1,11 @@
 namespace lhwm_bridge;
 
+using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using LibreHardwareMonitor.Hardware;
+using static lhwm_bridge.FFI;
+
 
 public static class FFI
 {
@@ -18,21 +21,11 @@ public static class FFI
     }
 
     /// <summary>
-    /// Free a shared hardware array
+    /// Free a shared array
     /// </summary>
     /// <param name="ptr">The array to free</param>
-    [UnmanagedCallersOnly(EntryPoint = "free_hardware_array", CallConvs = new[] { typeof(CallConvCdecl) })]
-    public static void FreeHardwareArray(SharedFfiArrayPtr<HardwarePtr> ptr)
-    {
-        ptr.Dispose();
-    }
-
-    /// <summary>
-    /// Free a shared sensor array
-    /// </summary>
-    /// <param name="ptr">The array to free</param>
-    [UnmanagedCallersOnly(EntryPoint = "free_sensor_array", CallConvs = new[] { typeof(CallConvCdecl) })]
-    public static void FreeSensorArray(SharedFfiArrayPtr<SensorPtr> ptr)
+    [UnmanagedCallersOnly(EntryPoint = "free_shared_array", CallConvs = new[] { typeof(CallConvCdecl) })]
+    public static void FreeSharedArray(SharedFfiArrayPtr ptr)
     {
         ptr.Dispose();
     }
@@ -41,20 +34,20 @@ public static class FFI
     /// Create a new computer instance
     /// </summary>
     /// <returns>Created computer or an error</returns>
-    [UnmanagedCallersOnly(EntryPoint = "new_computer", CallConvs = new[] { typeof(CallConvCdecl) })]
-    public static Result<ComputerPtr, Utf8Ptr> CreateComputer()
+    [UnmanagedCallersOnly(EntryPoint = "create_computer", CallConvs = new[] { typeof(CallConvCdecl) })]
+    public static ComputerResult CreateComputer()
     {
         try
         {
             Computer computer = new Computer { };
             computer.Open();
-            return Result<ComputerPtr, Utf8Ptr>.Success(new ComputerPtr(computer));
+            return ComputerResult.Success(new ComputerPtr(computer));
         }
         catch (Exception ex)
         {
             string message = ex.ToString();
             Utf8Ptr ptr = new Utf8Ptr(message);
-            return Result<ComputerPtr, Utf8Ptr>.Error(ptr);
+            return ComputerResult.Error(ptr);
         }
     }
 
@@ -89,17 +82,10 @@ public static class FFI
     }
 
 
-    [UnmanagedCallersOnly(EntryPoint = "get_hardware_children", CallConvs = new[] { typeof(CallConvCdecl) })]
-    public static SharedFfiArray<HardwarePtr> GetHardwareChildren(ComputerPtr ptr)
+    [UnmanagedCallersOnly(EntryPoint = "get_computer_hardware", CallConvs = new[] { typeof(CallConvCdecl) })]
+    public static SharedFfiArray<HardwarePtr> getComputerHardware(ComputerPtr ptr)
     {
         return ptr.getHardware();
-    }
-
-
-    [UnmanagedCallersOnly(EntryPoint = "get_hardware_sensors", CallConvs = new[] { typeof(CallConvCdecl) })]
-    public static SharedFfiArray<SensorPtr> GetHardwareSensors(HardwarePtr ptr)
-    {
-        return ptr.getSensors();
     }
 
     [UnmanagedCallersOnly(EntryPoint = "get_hardware_identifier", CallConvs = new[] { typeof(CallConvCdecl) })]
@@ -114,6 +100,27 @@ public static class FFI
         return ptr.getName();
     }
 
+    [UnmanagedCallersOnly(EntryPoint = "get_hardware_type", CallConvs = new[] { typeof(CallConvCdecl) })]
+    public static int GetHardwareType(HardwarePtr ptr)
+    {
+        return ptr.getType();
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "get_hardware_children", CallConvs = new[] { typeof(CallConvCdecl) })]
+    public static SharedFfiArray<HardwarePtr> GetHardwareChildren(HardwarePtr ptr)
+    {
+        return ptr.getSubHardware();
+    }
+
+
+
+    [UnmanagedCallersOnly(EntryPoint = "get_hardware_sensors", CallConvs = new[] { typeof(CallConvCdecl) })]
+    public static SharedFfiArray<SensorPtr> GetHardwareSensors(HardwarePtr ptr)
+    {
+        return ptr.getSensors();
+    }
+
+
     [UnmanagedCallersOnly(EntryPoint = "update_hardware", CallConvs = new[] { typeof(CallConvCdecl) })]
     public static void UpdateHardware(HardwarePtr ptr)
     {
@@ -125,6 +132,7 @@ public static class FFI
     {
         ptr.Dispose();
     }
+
 
     [UnmanagedCallersOnly(EntryPoint = "get_sensor_hardware", CallConvs = new[] { typeof(CallConvCdecl) })]
     public static HardwarePtr GetSensorHardware(SensorPtr ptr)
@@ -146,25 +154,31 @@ public static class FFI
         return ptr.getName();
     }
 
+    [UnmanagedCallersOnly(EntryPoint = "get_sensor_type", CallConvs = new[] { typeof(CallConvCdecl) })]
+    public static int GetSensorType(SensorPtr ptr)
+    {
+        return ptr.getType();
+    }
+
 
     [UnmanagedCallersOnly(EntryPoint = "get_sensor_value", CallConvs = new[] { typeof(CallConvCdecl) })]
-    public static float? GetSensorValue(SensorPtr ptr)
+    public static float GetSensorValue(SensorPtr ptr)
     {
-        return ptr.getValue();
+        return ptr.getValue() ?? float.NaN;
     }
 
 
     [UnmanagedCallersOnly(EntryPoint = "get_sensor_min", CallConvs = new[] { typeof(CallConvCdecl) })]
-    public static float? getSensorMin(SensorPtr ptr)
+    public static float getSensorMin(SensorPtr ptr)
     {
-        return ptr.getMin();
+        return ptr.getMin() ?? float.NaN;
     }
 
 
     [UnmanagedCallersOnly(EntryPoint = "get_sensor_max", CallConvs = new[] { typeof(CallConvCdecl) })]
-    public static float? getSensorMax(SensorPtr ptr)
+    public static float getSensorMax(SensorPtr ptr)
     {
-        return ptr.getMax();
+        return ptr.getMax() ?? float.NaN;
     }
 
 

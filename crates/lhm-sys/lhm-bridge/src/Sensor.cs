@@ -1,5 +1,6 @@
 namespace lhwm_bridge;
 
+using System;
 using System.Runtime.InteropServices;
 using LibreHardwareMonitor.Hardware;
 
@@ -66,6 +67,11 @@ public readonly struct SensorPtr : IDisposable
         return new Utf8Ptr(sensor.Name);
     }
 
+
+    public int getType()
+    {
+        return (int)sensor.SensorType;
+    }
 
     /// <summary>
     /// Get the name of the hardware item

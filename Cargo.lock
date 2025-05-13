@@ -298,8 +298,6 @@ name = "lhm-sys"
 version = "0.0.0"
 dependencies = [
  "dlopen",
- "dlopen_derive",
- "lhm-shared",
 ]
 
 [[package]]

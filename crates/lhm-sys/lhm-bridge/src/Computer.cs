@@ -1,5 +1,7 @@
 namespace lhwm_bridge;
 
+using System;
+using System.Linq;
 using System.Runtime.InteropServices;
 using LibreHardwareMonitor.Hardware;
 

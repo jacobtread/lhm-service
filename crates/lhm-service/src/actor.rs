@@ -1,7 +1,7 @@
-use lhm_shared::{ComputerOptions, Hardware};
+use lhm_shared::{ComputerOptions, Hardware, HardwareType, Sensor, SensorType};
 use tokio::sync::{mpsc, oneshot};
 
-use lhm_sys::{Bridge, Computer};
+use lhm_sys::{Computer, SharedApi};
 
 pub struct ComputerActor {}
 
@@ -47,12 +47,12 @@ pub enum ComputerActorMessage {
 }
 
 impl ComputerActor {
-    pub fn create(bridge: Bridge, options: ComputerOptions) -> ComputerActorHandle {
+    pub fn create(bridge: SharedApi) -> ComputerActorHandle {
         let (tx, mut rx) = mpsc::unbounded_channel();
 
         std::thread::spawn(move || {
             // Run service
-            let mut computer = match Computer::create(&bridge, options) {
+            let mut computer = match Computer::create(bridge) {
                 Ok(value) => value,
                 Err(err) => {
                     eprintln!("failed to start computer service: {err}");
@@ -67,11 +67,47 @@ impl ComputerActor {
                         _ = tx.send(())
                     }
                     ComputerActorMessage::GetHardware { tx } => {
-                        let hardware = computer.get_hardware();
-                        _ = tx.send(hardware);
+                        fn create_hardware(hardware: lhm_sys::Hardware) -> Hardware {
+                            Hardware {
+                                name: hardware.get_name(),
+                                ty: HardwareType::from(hardware.get_type()),
+                                children: hardware
+                                    .get_children()
+                                    .into_iter()
+                                    .map(create_hardware)
+                                    .collect(),
+                                sensors: hardware
+                                    .get_sensors()
+                                    .into_iter()
+                                    .map(|sensor| Sensor {
+                                        name: sensor.name(),
+                                        ty: SensorType::from(sensor.get_type()),
+                                        value: sensor.value(),
+                                    })
+                                    .collect(),
+                            }
+                        }
+
+                        let items = computer
+                            .hardware()
+                            .into_iter()
+                            .map(create_hardware)
+                            .collect();
+
+                        _ = tx.send(items);
                     }
                     ComputerActorMessage::SetOptions { options, tx } => {
-                        computer.update_options(options);
+                        computer.set_options(lhm_sys::ComputerOptions {
+                            battery_enabled: options.battery_enabled,
+                            controller_enabled: options.controller_enabled,
+                            cpu_enabled: options.cpu_enabled,
+                            gpu_enabled: options.gpu_enabled,
+                            memory_enabled: options.memory_enabled,
+                            motherboard_enabled: options.motherboard_enabled,
+                            network_enabled: options.network_enabled,
+                            psu_enabled: options.psu_enabled,
+                            storage_enabled: options.storage_enabled,
+                        });
                         _ = tx.send(());
                     }
                 }

@@ -1,5 +1,6 @@
 namespace lhwm_bridge;
 
+using System;
 using System.Runtime.InteropServices;
 
 /// <summary>
@@ -43,6 +44,11 @@ public readonly struct Utf8Ptr : IDisposable
     /// </summary>
     public void Dispose()
     {
+        if (data == IntPtr.Zero)
+        {
+            return;
+        }
+
         Marshal.FreeHGlobal(data);
     }
 }
