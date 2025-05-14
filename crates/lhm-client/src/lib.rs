@@ -6,7 +6,6 @@ pub use lhm_shared::*;
 
 /// Client for accessing the LHM pipe
 pub struct LHMClient {
-    ///
     pipe: DuplexPipeStream<pipe_mode::Bytes>,
 }
 

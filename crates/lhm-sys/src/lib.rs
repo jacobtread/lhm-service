@@ -14,7 +14,7 @@
 use dlopen::raw::Library;
 use std::sync::Arc;
 use std::{
-    ffi::{CStr, OsStr, c_void},
+    ffi::{CStr, c_void},
     marker::PhantomData,
     path::Path,
 };
