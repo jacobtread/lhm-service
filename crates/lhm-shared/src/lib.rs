@@ -19,38 +19,68 @@ pub struct ComputerOptions {
 #[derive(Deserialize, Serialize)]
 #[serde(tag = "type")]
 pub enum PipeRequest {
-    SetOptions { options: ComputerOptions },
-    Update,
-    GetHardware,
+    SetOptions {
+        options: ComputerOptions,
+    },
+    UpdateAll,
+    GetHardwareById {
+        id: String,
+    },
+    QueryHardware {
+        parent_id: Option<String>,
+        ty: Option<HardwareType>,
+    },
+    UpdateHardwareById {
+        id: String,
+    },
+    GetSensorById {
+        id: String,
+    },
+    GetSensorValueById {
+        id: String,
+        update: bool,
+    },
+    QuerySensors {
+        parent_id: Option<String>,
+        ty: Option<SensorType>,
+    },
+    UpdateSensorById {
+        id: String,
+    },
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "type")]
 pub enum PipeResponse {
-    Hardware { hardware: Vec<Hardware> },
-    Updated,
-    UpdatedOptions,
+    Hardware { hardware: Option<Hardware> },
+    Hardwares { hardware: Vec<Hardware> },
+
+    Sensor { sensor: Option<Sensor> },
+    SensorValue { value: Option<f32> },
+    Sensors { sensors: Vec<Sensor> },
+
+    Success,
     Error { error: String },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Hardware {
+    /// Unique identifier for the hardware
+    pub identifier: String,
+
     /// Name of the hardware
     pub name: String,
 
     /// Type of hardware
     pub ty: HardwareType,
-
-    /// Children for the hardware
-    pub children: Vec<Hardware>,
-
-    /// Sensors attached to the hardware
-    pub sensors: Vec<Sensor>,
 }
 
 /// Instance of a sensor
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Sensor {
+    /// Unique identifier for the hardware
+    pub identifier: String,
+
     /// Name of the sensor
     pub name: String,
 

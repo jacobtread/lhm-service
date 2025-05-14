@@ -1,4 +1,4 @@
-use crate::actor::ComputerActor;
+use crate::actor::{ComputerActor, ComputerActorHandle};
 use interprocess::os::windows::named_pipe::tokio::{DuplexPipeStream, PipeListenerOptionsExt};
 use interprocess::os::windows::named_pipe::{PipeListenerOptions, pipe_mode};
 use interprocess::os::windows::security_descriptor::SecurityDescriptor;
@@ -29,6 +29,50 @@ pub async fn run_server() -> std::io::Result<()> {
     }
 }
 
+pub async fn handle_request(
+    request: PipeRequest,
+    handle: &ComputerActorHandle,
+) -> anyhow::Result<PipeResponse> {
+    match request {
+        PipeRequest::UpdateAll => {
+            handle.update_all().await?;
+            Ok(PipeResponse::Success)
+        }
+        PipeRequest::SetOptions { options } => {
+            handle.set_options(options).await?;
+            Ok(PipeResponse::Success)
+        }
+        PipeRequest::GetHardwareById { id } => {
+            let hardware = handle.get_hardware_by_id(id).await?;
+            Ok(PipeResponse::Hardware { hardware })
+        }
+        PipeRequest::QueryHardware { parent_id, ty } => {
+            let hardware = handle.get_hardware(parent_id, ty).await?;
+            Ok(PipeResponse::Hardwares { hardware })
+        }
+        PipeRequest::UpdateHardwareById { id } => {
+            handle.update_hardware_by_id(id).await?;
+            Ok(PipeResponse::Success)
+        }
+        PipeRequest::GetSensorById { id } => {
+            let sensor = handle.get_sensor_by_id(id).await?;
+            Ok(PipeResponse::Sensor { sensor })
+        }
+        PipeRequest::GetSensorValueById { id, update } => {
+            let value = handle.get_sensor_value_by_id(id, update).await?;
+            Ok(PipeResponse::SensorValue { value })
+        }
+        PipeRequest::QuerySensors { parent_id, ty } => {
+            let sensors = handle.get_sensors(parent_id, ty).await?;
+            Ok(PipeResponse::Sensors { sensors })
+        }
+        PipeRequest::UpdateSensorById { id } => {
+            handle.update_sensor_by_id(id).await?;
+            Ok(PipeResponse::Success)
+        }
+    }
+}
+
 pub async fn handle_pipe_stream(bridge: SharedApi, mut stream: DuplexPipeStream<pipe_mode::Bytes>) {
     // Initialize an actor
     let handle = ComputerActor::create(bridge);
@@ -49,66 +93,21 @@ pub async fn handle_pipe_stream(bridge: SharedApi, mut stream: DuplexPipeStream<
             }
         };
 
-        match request {
-            PipeRequest::Update => match handle.update().await {
-                Ok(_) => {
-                    if send_message(&mut stream, PipeResponse::Updated)
-                        .await
-                        .is_err()
-                    {
-                        return;
-                    }
+        match handle_request(request, &handle).await {
+            Ok(response) => {
+                if send_message(&mut stream, response).await.is_err() {
+                    return;
                 }
-                Err(err) => {
-                    let error = err.to_string();
-                    if send_message(&mut stream, PipeResponse::Error { error })
-                        .await
-                        .is_err()
-                    {
-                        return;
-                    }
-                }
-            },
-            PipeRequest::GetHardware => {
-                match handle.get_hardware().await {
-                    Ok(hardware) => {
-                        if send_message(&mut stream, PipeResponse::Hardware { hardware })
-                            .await
-                            .is_err()
-                        {
-                            return;
-                        }
-                    }
-                    Err(err) => {
-                        let error = err.to_string();
-                        if send_message(&mut stream, PipeResponse::Error { error })
-                            .await
-                            .is_err()
-                        {
-                            return;
-                        }
-                    }
-                };
             }
-            PipeRequest::SetOptions { options } => match handle.set_options(options).await {
-                Ok(_) => {
-                    if send_message(&mut stream, PipeResponse::UpdatedOptions)
-                        .await
-                        .is_err()
-                    {
-                        return;
-                    }
+            Err(err) => {
+                let error = err.to_string();
+                if send_message(&mut stream, PipeResponse::Error { error })
+                    .await
+                    .is_err()
+                {
+                    return;
                 }
-                Err(err) => {
-                    let error = err.to_string();
-                    if send_message(&mut stream, PipeResponse::Error { error })
-                        .await
-                        .is_err()
-                    {
-                        return;
-                    }
-                }
-            },
+            }
         }
     }
 }

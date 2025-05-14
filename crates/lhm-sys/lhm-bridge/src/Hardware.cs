@@ -12,6 +12,13 @@ public readonly struct HardwarePtr : IDisposable
     /// </summary>
     private readonly IntPtr data;
 
+    public static HardwarePtr Null = new HardwarePtr(IntPtr.Zero);
+
+    public HardwarePtr(IntPtr ptr)
+    {
+        data = ptr;
+    }
+
     /// <summary>
     /// Create a new hardware pointer from a hardware item
     /// </summary>
@@ -28,6 +35,11 @@ public readonly struct HardwarePtr : IDisposable
     {
         get
         {
+            if (data == IntPtr.Zero)
+            {
+                throw new InvalidOperationException("hardware is null");
+            }
+
             var handle = GCHandle.FromIntPtr(data);
 
             if (handle.Target is IHardware hardware)

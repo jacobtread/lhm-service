@@ -275,12 +275,12 @@ pub struct Hardware {
 }
 
 impl Hardware {
-    pub fn get_identifier(&self) -> String {
+    pub fn identifier(&self) -> String {
         let value_ptr = unsafe { (self.api.get_hardware_identifier)(self.ptr) };
         copy_string(&self.api, value_ptr)
     }
 
-    pub fn get_name(&self) -> String {
+    pub fn name(&self) -> String {
         let value_ptr = unsafe { (self.api.get_hardware_name)(self.ptr) };
         copy_string(&self.api, value_ptr)
     }
@@ -312,7 +312,7 @@ impl Hardware {
         children
     }
 
-    pub fn get_sensors(&self) -> Vec<Sensor> {
+    pub fn sensors(&self) -> Vec<Sensor> {
         // Get the name
         let array = unsafe { (self.api.get_hardware_sensors)(self.ptr) };
 
