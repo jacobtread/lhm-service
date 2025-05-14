@@ -38,7 +38,7 @@ impl ComputerActorHandle {
         ty: Option<HardwareType>,
     ) -> anyhow::Result<Vec<Hardware>> {
         let (tx, rx) = oneshot::channel();
-        self.tx.send(ComputerActorMessage::GetHardware {
+        self.tx.send(ComputerActorMessage::QueryHardware {
             parent_id: parent_identifier,
             ty,
             tx,
@@ -55,6 +55,14 @@ impl ComputerActorHandle {
         Ok(())
     }
 
+    pub async fn update_hardware_by_idx(&self, idx: usize) -> anyhow::Result<()> {
+        let (tx, rx) = oneshot::channel();
+        self.tx
+            .send(ComputerActorMessage::UpdateHardwareByIndex { idx, tx })?;
+        rx.await?;
+        Ok(())
+    }
+
     pub async fn get_sensor_by_id(&self, identifier: String) -> anyhow::Result<Option<Sensor>> {
         let (tx, rx) = oneshot::channel();
         self.tx
@@ -62,6 +70,7 @@ impl ComputerActorHandle {
         let value = rx.await?;
         Ok(value)
     }
+
     pub async fn get_sensor_value_by_id(
         &self,
         identifier: String,
@@ -77,13 +86,25 @@ impl ComputerActorHandle {
         Ok(value)
     }
 
+    pub async fn get_sensor_value_by_idx(
+        &self,
+        idx: usize,
+        update: bool,
+    ) -> anyhow::Result<Option<f32>> {
+        let (tx, rx) = oneshot::channel();
+        self.tx
+            .send(ComputerActorMessage::GetSensorValueByIndex { idx, update, tx })?;
+        let value = rx.await?;
+        Ok(value)
+    }
+
     pub async fn get_sensors(
         &self,
         parent_identifier: Option<String>,
         ty: Option<SensorType>,
     ) -> anyhow::Result<Vec<Sensor>> {
         let (tx, rx) = oneshot::channel();
-        self.tx.send(ComputerActorMessage::GetSensors {
+        self.tx.send(ComputerActorMessage::QuerySensors {
             parent_id: parent_identifier,
             ty,
             tx,
@@ -96,6 +117,14 @@ impl ComputerActorHandle {
         let (tx, rx) = oneshot::channel();
         self.tx
             .send(ComputerActorMessage::UpdateSensorById { id: identifier, tx })?;
+        rx.await?;
+        Ok(())
+    }
+
+    pub async fn update_sensor_by_idx(&self, idx: usize) -> anyhow::Result<()> {
+        let (tx, rx) = oneshot::channel();
+        self.tx
+            .send(ComputerActorMessage::UpdateSensorByIndex { idx, tx })?;
         rx.await?;
         Ok(())
     }
@@ -124,7 +153,7 @@ pub enum ComputerActorMessage {
     },
 
     /// Get hardware
-    GetHardware {
+    QueryHardware {
         /// Identifier of the parent hardware if fetching children
         /// for a hardware
         parent_id: Option<String>,
@@ -145,6 +174,15 @@ pub enum ComputerActorMessage {
         tx: oneshot::Sender<()>,
     },
 
+    /// Update a specific hardware item by index
+    UpdateHardwareByIndex {
+        /// Index of the hardware
+        idx: usize,
+
+        /// Sender to notify after the update
+        tx: oneshot::Sender<()>,
+    },
+
     /// Get a specific sensor by ID
     GetSensorById {
         /// Identifier of the sensor
@@ -154,7 +192,7 @@ pub enum ComputerActorMessage {
         tx: oneshot::Sender<Option<Sensor>>,
     },
 
-    /// Get a specific sensor by ID
+    /// Get a specific sensor value by ID
     GetSensorValueById {
         /// Identifier of the sensor
         id: String,
@@ -165,9 +203,20 @@ pub enum ComputerActorMessage {
         /// Sender for sending back the result
         tx: oneshot::Sender<Option<f32>>,
     },
+    /// Get a specific sensor value by index
+    GetSensorValueByIndex {
+        /// Index of the sensor
+        idx: usize,
+
+        /// Whether to update the value before loading it
+        update: bool,
+
+        /// Sender for sending back the result
+        tx: oneshot::Sender<Option<f32>>,
+    },
 
     /// Get sensors
-    GetSensors {
+    QuerySensors {
         /// Optional identifier for a required parent hardware item. When set
         /// the hardware parent for the sensor must have a matching identifier
         parent_id: Option<String>,
@@ -179,10 +228,19 @@ pub enum ComputerActorMessage {
         tx: oneshot::Sender<Vec<Sensor>>,
     },
 
-    /// Update a specific hardware item
+    /// Update a specific sensor item
     UpdateSensorById {
         /// Identifier of the sensor
         id: String,
+
+        /// Sender to notify after the update
+        tx: oneshot::Sender<()>,
+    },
+
+    /// Update a specific sensor item using its index
+    UpdateSensorByIndex {
+        /// Index of the sensor
+        idx: usize,
 
         /// Sender to notify after the update
         tx: oneshot::Sender<()>,
@@ -257,27 +315,31 @@ impl HardwareCache {
         }
     }
 
-    pub fn get_hardware_by_id(&self, identifier: &str) -> Option<&lhm_sys::Hardware> {
-        let index = self.hardware_lookup.get(identifier)?;
-        let hardware = &self.hardware[index.index];
-        Some(hardware)
+    pub fn get_hardware_by_id(&self, identifier: &str) -> Option<(usize, &lhm_sys::Hardware)> {
+        let lookup_index = self.hardware_lookup.get(identifier)?;
+        let index = lookup_index.index;
+        let hardware = &self.hardware[index];
+        Some((index, hardware))
     }
 
-    pub fn get_sensor_by_id(&self, identifier: &str) -> Option<&lhm_sys::Sensor> {
-        let index = self.sensor_lookup.get(identifier)?;
-        let sensor = &self.sensors[index.index];
-        Some(sensor)
+    pub fn get_sensor_by_id(&self, identifier: &str) -> Option<(usize, &lhm_sys::Sensor)> {
+        let lookup_index = self.sensor_lookup.get(identifier)?;
+        let index = lookup_index.index;
+        let sensor = &self.sensors[index];
+        Some((index, sensor))
     }
 
     pub fn get_hardware_by_id_mut(&mut self, identifier: &str) -> Option<&mut lhm_sys::Hardware> {
-        let index = self.hardware_lookup.get(identifier)?;
-        let hardware = &mut self.hardware[index.index];
+        let lookup_index = self.hardware_lookup.get(identifier)?;
+        let index = lookup_index.index;
+        let hardware = &mut self.hardware[index];
         Some(hardware)
     }
 
     pub fn get_sensor_by_id_mut(&mut self, identifier: &str) -> Option<&mut lhm_sys::Sensor> {
-        let index = self.sensor_lookup.get(identifier)?;
-        let sensor = &mut self.sensors[index.index];
+        let lookup_index = self.sensor_lookup.get(identifier)?;
+        let index = lookup_index.index;
+        let sensor = &mut self.sensors[index];
         Some(sensor)
     }
 
@@ -285,7 +347,7 @@ impl HardwareCache {
         &self,
         hardware_identifier: Option<String>,
         ty: Option<HardwareType>,
-    ) -> Vec<&lhm_sys::Hardware> {
+    ) -> Vec<(usize, &lhm_sys::Hardware)> {
         let ty_value: Option<u32> = ty.map(|value| value.into());
 
         // Lookup the index for the parent item
@@ -304,7 +366,8 @@ impl HardwareCache {
 
         self.hardware
             .iter()
-            .filter(|hardware| {
+            .enumerate()
+            .filter(|(_, hardware)| {
                 // Filter by type
                 if let Some(ty_value) = &ty_value {
                     if hardware.get_type().ne(ty_value) {
@@ -335,7 +398,7 @@ impl HardwareCache {
         &self,
         hardware_identifier: Option<String>,
         ty: Option<SensorType>,
-    ) -> Vec<&lhm_sys::Sensor> {
+    ) -> Vec<(usize, &lhm_sys::Sensor)> {
         let ty_value: Option<u32> = ty.map(|value| value.into());
 
         // Lookup the index for the parent item
@@ -354,7 +417,8 @@ impl HardwareCache {
 
         self.sensors
             .iter()
-            .filter(|sensor| {
+            .enumerate()
+            .filter(|(_, sensor)| {
                 // Filter by type
                 if let Some(ty_value) = &ty_value {
                     if sensor.get_type().ne(ty_value) {
@@ -441,7 +505,7 @@ impl ComputerActor {
                     });
                     _ = tx.send(());
                 }
-                ComputerActorMessage::GetHardware {
+                ComputerActorMessage::QueryHardware {
                     parent_id: hardware_identifier,
                     ty,
                     tx,
@@ -450,7 +514,8 @@ impl ComputerActor {
                         .cache
                         .query_hardware(hardware_identifier, ty)
                         .into_iter()
-                        .map(|hardware| Hardware {
+                        .map(|(index, hardware)| Hardware {
+                            index,
                             identifier: hardware.identifier(),
                             name: hardware.name(),
                             ty: HardwareType::from(hardware.get_type()),
@@ -463,7 +528,8 @@ impl ComputerActor {
                     let hardware =
                         self.cache
                             .get_hardware_by_id(&identifier)
-                            .map(|hardware| Hardware {
+                            .map(|(index, hardware)| Hardware {
+                                index,
                                 identifier: hardware.identifier(),
                                 name: hardware.name(),
                                 ty: HardwareType::from(hardware.get_type()),
@@ -478,11 +544,19 @@ impl ComputerActor {
 
                     _ = tx.send(())
                 }
+                ComputerActorMessage::UpdateHardwareByIndex { idx, tx } => {
+                    if let Some(hardware) = self.cache.hardware.get_mut(idx) {
+                        hardware.update();
+                    }
+
+                    _ = tx.send(())
+                }
                 ComputerActorMessage::GetSensorById { id: identifier, tx } => {
                     let sensor = self
                         .cache
                         .get_sensor_by_id(&identifier)
-                        .map(|sensor| Sensor {
+                        .map(|(index, sensor)| Sensor {
+                            index,
                             identifier: sensor.identifier(),
                             name: sensor.name(),
                             ty: SensorType::from(sensor.get_type()),
@@ -506,7 +580,18 @@ impl ComputerActor {
 
                     _ = tx.send(sensor);
                 }
-                ComputerActorMessage::GetSensors {
+                ComputerActorMessage::GetSensorValueByIndex { idx, update, tx } => {
+                    let sensor = self.cache.sensors.get_mut(idx).map(|sensor| {
+                        if update {
+                            sensor.update();
+                        }
+
+                        sensor.value()
+                    });
+
+                    _ = tx.send(sensor);
+                }
+                ComputerActorMessage::QuerySensors {
                     parent_id: hardware_identifier,
                     ty,
                     tx,
@@ -515,7 +600,8 @@ impl ComputerActor {
                         .cache
                         .query_sensors(hardware_identifier, ty)
                         .into_iter()
-                        .map(|sensor| Sensor {
+                        .map(|(index, sensor)| Sensor {
+                            index,
                             identifier: sensor.identifier(),
                             name: sensor.name(),
                             ty: SensorType::from(sensor.get_type()),
@@ -528,6 +614,13 @@ impl ComputerActor {
 
                 ComputerActorMessage::UpdateSensorById { id: identifier, tx } => {
                     if let Some(sensor) = self.cache.get_sensor_by_id_mut(&identifier) {
+                        sensor.update();
+                    }
+
+                    _ = tx.send(())
+                }
+                ComputerActorMessage::UpdateSensorByIndex { idx, tx } => {
+                    if let Some(sensor) = self.cache.sensors.get_mut(idx) {
                         sensor.update();
                     }
 

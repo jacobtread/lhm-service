@@ -70,6 +70,18 @@ pub async fn handle_request(
             handle.update_sensor_by_id(id).await?;
             Ok(PipeResponse::Success)
         }
+        PipeRequest::UpdateHardwareByIndex { idx } => {
+            handle.update_hardware_by_idx(idx).await?;
+            Ok(PipeResponse::Success)
+        }
+        PipeRequest::GetSensorValueByIndex { idx, update } => {
+            let value = handle.get_sensor_value_by_idx(idx, update).await?;
+            Ok(PipeResponse::SensorValue { value })
+        }
+        PipeRequest::UpdateSensorByIndex { idx } => {
+            handle.update_sensor_by_idx(idx).await?;
+            Ok(PipeResponse::Success)
+        }
     }
 }
 

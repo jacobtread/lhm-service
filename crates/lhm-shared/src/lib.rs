@@ -33,11 +33,18 @@ pub enum PipeRequest {
     UpdateHardwareById {
         id: String,
     },
+    UpdateHardwareByIndex {
+        idx: usize,
+    },
     GetSensorById {
         id: String,
     },
     GetSensorValueById {
         id: String,
+        update: bool,
+    },
+    GetSensorValueByIndex {
+        idx: usize,
         update: bool,
     },
     QuerySensors {
@@ -46,6 +53,9 @@ pub enum PipeRequest {
     },
     UpdateSensorById {
         id: String,
+    },
+    UpdateSensorByIndex {
+        idx: usize,
     },
 }
 
@@ -65,6 +75,9 @@ pub enum PipeResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Hardware {
+    /// Cache index of the hardware
+    pub index: usize,
+
     /// Unique identifier for the hardware
     pub identifier: String,
 
@@ -78,6 +91,9 @@ pub struct Hardware {
 /// Instance of a sensor
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Sensor {
+    /// Cache index of the sensor
+    pub index: usize,
+
     /// Unique identifier for the hardware
     pub identifier: String,
 

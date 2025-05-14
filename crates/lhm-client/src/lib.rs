@@ -97,6 +97,16 @@ impl LHMClient {
         }
     }
 
+    pub async fn update_hardware_by_idx(&mut self, idx: usize) -> std::io::Result<()> {
+        self.send(PipeRequest::UpdateHardwareByIndex { idx })
+            .await?;
+        match self.recv().await? {
+            PipeResponse::Success => Ok(()),
+            PipeResponse::Error { error } => Err(std::io::Error::new(ErrorKind::Other, error)),
+            _ => Err(std::io::Error::new(ErrorKind::Other, "unexpected message")),
+        }
+    }
+
     pub async fn get_sensor_by_id(&mut self, id: String) -> std::io::Result<Option<Sensor>> {
         self.send(PipeRequest::GetSensorById { id }).await?;
         match self.recv().await? {
@@ -112,6 +122,20 @@ impl LHMClient {
         update: bool,
     ) -> std::io::Result<Option<f32>> {
         self.send(PipeRequest::GetSensorValueById { id, update })
+            .await?;
+        match self.recv().await? {
+            PipeResponse::SensorValue { value } => Ok(value),
+            PipeResponse::Error { error } => Err(std::io::Error::new(ErrorKind::Other, error)),
+            _ => Err(std::io::Error::new(ErrorKind::Other, "unexpected message")),
+        }
+    }
+
+    pub async fn get_sensor_value_by_idx(
+        &mut self,
+        idx: usize,
+        update: bool,
+    ) -> std::io::Result<Option<f32>> {
+        self.send(PipeRequest::GetSensorValueByIndex { idx, update })
             .await?;
         match self.recv().await? {
             PipeResponse::SensorValue { value } => Ok(value),
@@ -136,6 +160,15 @@ impl LHMClient {
 
     pub async fn update_sensor_by_id(&mut self, id: String) -> std::io::Result<()> {
         self.send(PipeRequest::UpdateSensorById { id }).await?;
+        match self.recv().await? {
+            PipeResponse::Success => Ok(()),
+            PipeResponse::Error { error } => Err(std::io::Error::new(ErrorKind::Other, error)),
+            _ => Err(std::io::Error::new(ErrorKind::Other, "unexpected message")),
+        }
+    }
+
+    pub async fn update_sensor_by_idx(&mut self, idx: usize) -> std::io::Result<()> {
+        self.send(PipeRequest::UpdateSensorByIndex { idx }).await?;
         match self.recv().await? {
             PipeResponse::Success => Ok(()),
             PipeResponse::Error { error } => Err(std::io::Error::new(ErrorKind::Other, error)),
@@ -184,6 +217,8 @@ mod test {
             .await
             .unwrap();
 
+        dbg!(&cpu_temps);
+
         // Find the package temperature
         let temp_sensor = cpu_temps
             .iter()
@@ -195,7 +230,7 @@ mod test {
         for _ in 0..15 {
             // Get the current sensor value
             let value = client
-                .get_sensor_value_by_id(temp_sensor.identifier.clone(), true)
+                .get_sensor_value_by_idx(temp_sensor.index, true)
                 .await
                 .unwrap()
                 .expect("cpu temp sensor is now unavailable");
