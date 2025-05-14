@@ -4,11 +4,14 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 pub use lhm_shared::*;
 
+/// Client for accessing the LHM pipe
 pub struct LHMClient {
+    ///
     pipe: DuplexPipeStream<pipe_mode::Bytes>,
 }
 
 impl LHMClient {
+    /// Connect to the pipe
     pub async fn connect() -> std::io::Result<Self> {
         let pipe = DuplexPipeStream::<pipe_mode::Bytes>::connect_by_path(PIPE_NAME).await?;
         Ok(Self { pipe })
@@ -47,6 +50,7 @@ impl LHMClient {
         Ok(response)
     }
 
+    /// Set the options for the computer (Which information to request)
     pub async fn set_options(&mut self, options: ComputerOptions) -> std::io::Result<()> {
         self.send(PipeRequest::SetOptions { options }).await?;
         match self.recv().await? {
@@ -56,6 +60,10 @@ impl LHMClient {
         }
     }
 
+    /// Request and update all hardware and sensors
+    ///
+    /// This is required before you can call any querying or getter
+    /// functions for hardware or sensors
     pub async fn update_all(&mut self) -> std::io::Result<()> {
         self.send(PipeRequest::UpdateAll).await?;
         match self.recv().await? {
@@ -65,6 +73,10 @@ impl LHMClient {
         }
     }
 
+    /// Requests a specific hardware item using its identifier
+    ///
+    /// You must call [Self::update_all] at least once before
+    /// you will get a [Some] value
     pub async fn get_hardware_by_id(&mut self, id: String) -> std::io::Result<Option<Hardware>> {
         self.send(PipeRequest::GetHardwareById { id }).await?;
         match self.recv().await? {
@@ -74,6 +86,10 @@ impl LHMClient {
         }
     }
 
+    /// Queries the currently loaded selection of hardware
+    ///
+    /// `parent_id` Filters only to hardware are children of a hardware with a specific ID
+    /// `ty` Filters only to hardware of a specific type
     pub async fn query_hardware(
         &mut self,
         parent_id: Option<String>,
@@ -88,6 +104,7 @@ impl LHMClient {
         }
     }
 
+    /// Updates a specific hardware item by ID
     pub async fn update_hardware_by_id(&mut self, id: String) -> std::io::Result<()> {
         self.send(PipeRequest::UpdateHardwareById { id }).await?;
         match self.recv().await? {
@@ -97,6 +114,13 @@ impl LHMClient {
         }
     }
 
+    /// Updates a specific hardware item using its cache index.
+    ///
+    /// This is more efficient than sending the large identifier string
+    /// in case where you are repeatedly calling update
+    ///
+    /// Note: Cache indexes will change each time [Self::update_all] is called
+    /// you must ensure you obtain the latest cache index.
     pub async fn update_hardware_by_idx(&mut self, idx: usize) -> std::io::Result<()> {
         self.send(PipeRequest::UpdateHardwareByIndex { idx })
             .await?;
@@ -107,6 +131,7 @@ impl LHMClient {
         }
     }
 
+    /// Get a specific sensor by ID
     pub async fn get_sensor_by_id(&mut self, id: String) -> std::io::Result<Option<Sensor>> {
         self.send(PipeRequest::GetSensorById { id }).await?;
         match self.recv().await? {
@@ -116,6 +141,10 @@ impl LHMClient {
         }
     }
 
+    /// Get the value of a specific sensor by ID
+    ///
+    /// If `update` true is provided the sensor will be updated before
+    /// querying   
     pub async fn get_sensor_value_by_id(
         &mut self,
         id: String,
@@ -130,6 +159,13 @@ impl LHMClient {
         }
     }
 
+    /// Get the value a specific sensor item using its cache index.
+    ///
+    /// This is more efficient than sending the large identifier string
+    /// in case where you are repeatedly loading the value
+    ///
+    /// Note: Cache indexes will change each time [Self::update_all] is called
+    /// you must ensure you obtain the latest cache index.
     pub async fn get_sensor_value_by_idx(
         &mut self,
         idx: usize,
@@ -144,6 +180,10 @@ impl LHMClient {
         }
     }
 
+    /// Queries the currently loaded selection of sensors
+    ///
+    /// `parent_id` Filters only to sensors are children of a hardware with a specific ID
+    /// `ty` Filters only to sensor of a specific type
     pub async fn query_sensors(
         &mut self,
         parent_id: Option<String>,
@@ -158,6 +198,7 @@ impl LHMClient {
         }
     }
 
+    /// Updates a specific sensor item by ID
     pub async fn update_sensor_by_id(&mut self, id: String) -> std::io::Result<()> {
         self.send(PipeRequest::UpdateSensorById { id }).await?;
         match self.recv().await? {
@@ -167,76 +208,19 @@ impl LHMClient {
         }
     }
 
+    /// Updates a specific sensor item using its cache index.
+    ///
+    /// This is more efficient than sending the large identifier string
+    /// in case where you are repeatedly calling update
+    ///
+    /// Note: Cache indexes will change each time [Self::update_all] is called
+    /// you must ensure you obtain the latest cache index.
     pub async fn update_sensor_by_idx(&mut self, idx: usize) -> std::io::Result<()> {
         self.send(PipeRequest::UpdateSensorByIndex { idx }).await?;
         match self.recv().await? {
             PipeResponse::Success => Ok(()),
             PipeResponse::Error { error } => Err(std::io::Error::new(ErrorKind::Other, error)),
             _ => Err(std::io::Error::new(ErrorKind::Other, "unexpected message")),
-        }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use std::time::Duration;
-
-    use tokio::time::sleep;
-
-    use crate::{ComputerOptions, HardwareType, LHMClient, SensorType};
-
-    #[tokio::test]
-    #[ignore = "Requires the service to be running"]
-    async fn main() {
-        let mut client = LHMClient::connect().await.unwrap();
-
-        client
-            .set_options(ComputerOptions {
-                controller_enabled: true,
-                cpu_enabled: true,
-                gpu_enabled: true,
-                motherboard_enabled: true,
-                ..Default::default()
-            })
-            .await
-            .unwrap();
-
-        client.update_all().await.unwrap();
-
-        // Request all CPU hardware
-        let cpus = client
-            .query_hardware(None, Some(HardwareType::Cpu))
-            .await
-            .unwrap();
-
-        let cpu = cpus.first().unwrap();
-
-        // Request all CPU temperature sensors
-        let cpu_temps = client
-            .query_sensors(Some(cpu.identifier.clone()), Some(SensorType::Temperature))
-            .await
-            .unwrap();
-
-        dbg!(&cpu_temps);
-
-        // Find the package temperature
-        let temp_sensor = cpu_temps
-            .iter()
-            .find(|sensor| sensor.name.eq("CPU Package"))
-            .expect("Missing cpu temp sensor");
-
-        println!("CPU is initially {}°C", temp_sensor.value);
-
-        for _ in 0..15 {
-            // Get the current sensor value
-            let value = client
-                .get_sensor_value_by_idx(temp_sensor.index, true)
-                .await
-                .unwrap()
-                .expect("cpu temp sensor is now unavailable");
-
-            println!("CPU is now {}°C", value);
-            sleep(Duration::from_secs(1)).await;
         }
     }
 }
