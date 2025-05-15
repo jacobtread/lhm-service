@@ -50,19 +50,20 @@ winget install Microsoft.DotNet.SDK.8
 
 ### 🧩 lhm-sys (Bridge)
 
-
-The `lhm-sys` crate serves as a bridge that connects AOT-compiled Rust code to C# through a dynamic link library (DLL). This crate builds C# code that interacts with the [LibreHardwareMonitorLib](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor) project and sets up the FFI layer for communication between Rust and C#.
-
+The `lhm-sys` crate serves as a bridge that connects AOT-compiled Rust code to C# through either static linking or a dynamic link library (DLL). This crate builds C# code that interacts with the [LibreHardwareMonitorLib](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor) project and sets up the FFI layer for communication between Rust and C#.
 
 ### 🛎️ lhm-service (Service)
 
-The `lhm-service` is a small Windows service that runs in the background. It creates a named pipe (`\\.\pipe\LHMLibreHardwareMonitorService`) for communication with user-land applications. The service interacts with Libre Hardware Monitor, providing hardware details to the client over this pipe via MsgPack.
+The `lhm-service` is a small Windows service that runs in the background. It runs the `lhm-server` as a windows service.
 
 - **Pre-built installer:** The lhm-service is provided as a pre-built installer through GitHub releases (automatically built by GitHub Actions).
 - As a consumer of the lhm-client library, you will likely want to bundle this installer with your application or direct users to install it manually.
 
 You can download the prebuilt installer from [Releases](https://github.com/jacobtread/lhm-service/releases/latest)
 
+### 🛎️ lhm-server (Service)
+
+The `lhm-server` is a small server. It creates a named pipe (`\\.\pipe\LHMLibreHardwareMonitorService`) for communication with user-land applications. The server interacts with Libre Hardware Monitor, providing hardware details to the client over this pipe via MsgPack. 
 
 ### 💬 lhm-client (Client)
 

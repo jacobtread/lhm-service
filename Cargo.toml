@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "crates/lhm-shared",
+    "crates/lhm-server",
     "crates/lhm-service",
     "crates/lhm-client",
     "crates/lhm-sys",

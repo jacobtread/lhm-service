@@ -9,6 +9,8 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::task::spawn_local;
 use widestring::U16CString;
 
+mod actor;
+
 pub async fn run_server() -> std::io::Result<()> {
     let listener = PipeListenerOptions::new()
         .mode(interprocess::os::windows::named_pipe::PipeMode::Bytes)

@@ -1,0 +1,28 @@
+[package]
+name = "lhm-server"
+version = "0.0.0"
+edition = "2024"
+license = "MIT"
+authors = ["Jacobtread <jacobtread@gmail.com>"]
+repository = "https://github.com/jacobtread/lhm-service"
+readme = "README.md"
+description = "Server for running LHM and allowing clients to connect to it without requiring admin rights"
+
+[dependencies]
+# Error type
+anyhow = "1"
+
+interprocess = { workspace = true }
+rmp-serde = { workspace = true }
+
+# Async runtime 
+tokio = { version = "1", features = ["rt", "sync"] }
+
+# Wide string for creating a security descriptor
+widestring = "1"
+
+# Shared helpers
+lhm-shared = { version = "0.0.0", path = "../lhm-shared" }
+
+# Core library
+lhm-sys = { version = "0.0.0", path = "../lhm-sys" }

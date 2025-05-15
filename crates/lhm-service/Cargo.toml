@@ -12,23 +12,11 @@ description = "Windows service for running LHM and allowing clients to connect t
 # Error type
 anyhow = "1"
 
-# Command line argument parsing
-clap = { version = "4", features = ["derive"] }
-
-interprocess = { workspace = true }
-rmp-serde = { workspace = true }
-
 # Async runtime 
 tokio = { version = "1", features = ["rt", "sync"] }
-
-# Wide string for creating a security descriptor
-widestring = "1"
 
 # Windows service library
 windows-service = "0.7"
 
-# Shared helpers
-lhm-shared = { version = "0.0.0", path = "../lhm-shared" }
-
-lhm-sys = { version = "0.0.0", path = "../lhm-sys" }
-# Core library
+# Server to handle requests
+lhm-server = { version = "0.0.0", path = "../lhm-server" }
