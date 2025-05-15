@@ -8,12 +8,24 @@
     <Nullable>enable</Nullable>
     <OutputType>Library</OutputType>
     <PublishAot>true</PublishAot>
+    <SelfContained>true</SelfContained>
     <InvariantGlobalization>true</InvariantGlobalization>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
 
+
   <ItemGroup>
-    <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.4" />
+    <RdXmlFile Include="rd.xml" />
+    <IlcArg Include="--stacktracedata" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Include="src/**/*.cs" />
+
+    <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.4" />
+
+    <!-- Using older version of ILCompiler, this seems to be the only one that works without issues
+    for this project -->
+    <PackageReference Include="Microsoft.DotNet.ILCompiler" Version="7.0.0-*" />
   </ItemGroup>
 </Project>
