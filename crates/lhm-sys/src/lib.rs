@@ -107,6 +107,9 @@ pub struct Computer {
     ptr: ComputerPtr,
 }
 
+/// It is safe to move the pointer to another thread
+unsafe impl Send for Computer {}
+
 impl Computer {
     /// Create a new instance of the
     pub fn create() -> std::io::Result<Self> {
@@ -172,6 +175,9 @@ impl Drop for Computer {
 pub struct Hardware {
     ptr: HardwarePtr,
 }
+
+/// It is safe to move the pointer to another thread
+unsafe impl Send for Hardware {}
 
 impl Hardware {
     /// Get the identifier of the hardware item
@@ -247,6 +253,9 @@ impl Drop for Hardware {
 pub struct Sensor {
     ptr: SensorPtr,
 }
+
+/// It is safe to move the pointer to another thread
+unsafe impl Send for Sensor {}
 
 impl Sensor {
     /// Get the parent hardware

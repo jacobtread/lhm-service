@@ -12,7 +12,7 @@ use lhm_shared::{
     codec::{LHMFrame, LHMFrameCodec},
 };
 use pipe::{PipeFuture, PipeTx};
-use tokio::spawn;
+use tokio::{spawn, sync::oneshot};
 use tokio_util::{bytes::Bytes, codec::Framed};
 use widestring::U16CString;
 mod pipe;
@@ -43,7 +43,13 @@ pub type Pipe = Framed<DuplexPipeStream<pipe_mode::Bytes>, LHMFrameCodec>;
 
 pub fn handle_pipe_stream(stream: DuplexPipeStream<pipe_mode::Bytes>) {
     // Initialize an actor
-    let handle = ComputerActor::create();
+    let handle = match ComputerActor::create() {
+        Ok(value) => value,
+        Err(_cause) => {
+            return;
+        }
+    };
+
     let pipe = Framed::new(stream, LHMFrameCodec::default());
 
     let (future, mut rx, tx) = PipeFuture::new(pipe);
@@ -76,7 +82,6 @@ fn handle_frame(frame: LHMFrame, handle: &ComputerActorHandle, tx: &PipeTx) {
             };
 
             _ = tx.send(frame);
-
             return;
         }
     };
@@ -121,54 +126,8 @@ pub async fn handle_request_inner(
     request: PipeRequest,
     handle: ComputerActorHandle,
 ) -> anyhow::Result<PipeResponse> {
-    match request {
-        PipeRequest::UpdateAll => {
-            handle.update_all().await?;
-            Ok(PipeResponse::Success)
-        }
-        PipeRequest::SetOptions { options } => {
-            handle.set_options(options).await?;
-            Ok(PipeResponse::Success)
-        }
-        PipeRequest::GetHardwareById { id } => {
-            let hardware = handle.get_hardware_by_id(id).await?;
-            Ok(PipeResponse::Hardware { hardware })
-        }
-        PipeRequest::QueryHardware { parent_id, ty } => {
-            let hardware = handle.get_hardware(parent_id, ty).await?;
-            Ok(PipeResponse::Hardwares { hardware })
-        }
-        PipeRequest::UpdateHardwareById { id } => {
-            handle.update_hardware_by_id(id).await?;
-            Ok(PipeResponse::Success)
-        }
-        PipeRequest::GetSensorById { id } => {
-            let sensor = handle.get_sensor_by_id(id).await?;
-            Ok(PipeResponse::Sensor { sensor })
-        }
-        PipeRequest::GetSensorValueById { id, update } => {
-            let value = handle.get_sensor_value_by_id(id, update).await?;
-            Ok(PipeResponse::SensorValue { value })
-        }
-        PipeRequest::QuerySensors { parent_id, ty } => {
-            let sensors = handle.get_sensors(parent_id, ty).await?;
-            Ok(PipeResponse::Sensors { sensors })
-        }
-        PipeRequest::UpdateSensorById { id } => {
-            handle.update_sensor_by_id(id).await?;
-            Ok(PipeResponse::Success)
-        }
-        PipeRequest::UpdateHardwareByIndex { idx } => {
-            handle.update_hardware_by_idx(idx).await?;
-            Ok(PipeResponse::Success)
-        }
-        PipeRequest::GetSensorValueByIndex { idx, update } => {
-            let value = handle.get_sensor_value_by_idx(idx, update).await?;
-            Ok(PipeResponse::SensorValue { value })
-        }
-        PipeRequest::UpdateSensorByIndex { idx } => {
-            handle.update_sensor_by_idx(idx).await?;
-            Ok(PipeResponse::Success)
-        }
-    }
+    let (tx, rx) = oneshot::channel();
+    handle.tx.send(ComputerActorMessage { request, tx })?;
+    let response = rx.await?;
+    Ok(response)
 }
