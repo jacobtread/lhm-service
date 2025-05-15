@@ -99,12 +99,6 @@ unsafe extern "C" {
     unsafe fn free_sensor(ptr: SensorPtr);
 }
 
-#[test]
-fn test() {
-    let result = unsafe { create_computer() };
-    println!("CREATED COMPUTER")
-}
-
 pub struct Computer {
     ptr: ComputerPtr,
 }

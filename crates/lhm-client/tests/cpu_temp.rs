@@ -27,14 +27,14 @@ async fn get_cpu_temperature() {
     println!("Updated hardware");
 
     // Request all CPU hardware
-    let cpus = client
+    let cpu_list = client
         .query_hardware(None, Some(HardwareType::Cpu))
         .await
         .unwrap();
 
     println!("Querying hardware");
 
-    let cpu = cpus.first().unwrap();
+    let cpu = cpu_list.first().unwrap();
 
     // Request all CPU temperature sensors
     let cpu_temps = client
