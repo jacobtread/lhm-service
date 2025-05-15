@@ -21,6 +21,14 @@ fn build_library() {
     let intermediate_path = out_path.join("lhm-bridge-build");
     let publish_path = out_path.join("lhm-bridge");
 
+    // Path to the nuget packages
+    let nuget_path = out_path.join(".nuget");
+
+    // Change nuget packages path
+    unsafe {
+        env::set_var("NUGET_PACKAGES", nuget_path.clone());
+    }
+
     // Run the build command
     let status = Command::new("dotnet")
         .arg("publish")
@@ -43,9 +51,16 @@ fn build_library() {
         .status()
         .expect("Failed to execute dotnet publish");
 
+    // Build the C# project
     if !status.success() {
         panic!("failed to build binding library");
     }
+
+    // Get the AOT SDK path
+    let sdk_path = nuget_path
+        .join("runtime.win-x64.microsoft.dotnet.ilcompiler")
+        .join("7.0.0")
+        .join("sdk");
 
     // Re-run build script if the bridge code changes
     println!(
@@ -53,30 +68,24 @@ fn build_library() {
         project_path.join("Bridge.cs").display()
     );
 
+    // Setup linker paths
     println!("cargo:rustc-link-search=native={}", publish_path.display());
-    println!(
-        "cargo:rustc-link-search=native={}",
-        get_sdk_path().display()
-    );
-    println!("cargo:rustc-flags=-l ole32");
-    println!("cargo:rustc-link-lib=static=lhm-bridge");
+    println!("cargo:rustc-link-search=native={}", sdk_path.display());
+
+    // Link to required C# AOT libraries
     println!("cargo:rustc-link-lib=static=bootstrapperdll");
     println!("cargo:rustc-link-lib=static=Runtime.WorkstationGC");
     println!("cargo:rustc-link-lib=static=System.Globalization.Native.Aot");
     println!("cargo:rustc-link-lib=static=System.IO.Compression.Native.Aot");
 
-    println!("cargo:rustc-link-lib=dylib=Iphlpapi");
-    println!("cargo:rustc-link-lib=dylib=bcrypt");
-    println!("cargo:rustc-link-lib=dylib=OleAut32");
-    println!("cargo:rustc-link-lib=dylib=Crypt32");
-}
+    // Link to bridge library
+    println!("cargo:rustc-link-lib=static=lhm-bridge");
 
-fn get_sdk_path() -> PathBuf {
-    let mut home_dir = dirs::home_dir().unwrap();
-    home_dir.push(".nuget");
-    home_dir.push("packages");
-    home_dir.push("runtime.win-x64.microsoft.dotnet.ilcompiler");
-    home_dir.push("7.0.0");
-    home_dir.push("sdk");
-    home_dir
+    // Link to required system libraries
+    println!("cargo:rustc-link-lib=dylib=Iphlpapi");
+    println!("cargo:rustc-link-lib=dylib=Crypt32");
+    println!("cargo:rustc-link-lib=dylib=advapi32");
+    println!("cargo:rustc-link-lib=dylib=bcrypt");
+    println!("cargo:rustc-link-lib=dylib=ole32");
+    println!("cargo:rustc-link-lib=dylib=oleaut32");
 }

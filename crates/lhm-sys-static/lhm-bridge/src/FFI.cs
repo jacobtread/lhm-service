@@ -19,13 +19,6 @@ public class FFI
         ptr.Dispose();
     }
 
-    [UnmanagedCallersOnly(EntryPoint = "test", CallConvs = new[] { typeof(CallConvCdecl) })]
-    public static void Test()
-    {
-        Console.WriteLine("Hello from C#!");
-    }
-
-
     /// <summary>
     /// Free a shared array
     /// </summary>
