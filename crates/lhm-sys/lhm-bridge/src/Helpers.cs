@@ -15,6 +15,9 @@ public readonly struct Utf8Ptr : IDisposable
     /// </summary>
     public readonly IntPtr data;
 
+    public static Utf8Ptr Null = new Utf8Ptr(null);
+
+
     /// <summary>
     /// Create a UTF8 pointer 
     /// </summary>
