@@ -251,10 +251,14 @@ pub struct Sensor {
 }
 
 impl Sensor {
-    pub fn hardware(&self) -> Hardware {
+    pub fn hardware(&self) -> Option<Hardware> {
         let hardware_ptr = unsafe { get_sensor_hardware(self.ptr) };
 
-        Hardware { ptr: hardware_ptr }
+        if hardware_ptr.is_null() {
+            return None;
+        }
+
+        Some(Hardware { ptr: hardware_ptr })
     }
 
     pub fn identifier(&self) -> String {
