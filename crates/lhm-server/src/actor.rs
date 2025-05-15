@@ -346,7 +346,7 @@ impl HardwareCache {
         hardware_identifier: Option<String>,
         ty: Option<HardwareType>,
     ) -> Vec<(usize, &lhm_sys::Hardware)> {
-        let ty_value: Option<u32> = ty.map(|value| value.into());
+        let ty_value: Option<i32> = ty.map(|value| value.into());
 
         // Lookup the index for the parent item
         let parent_index = match hardware_identifier {
@@ -397,7 +397,7 @@ impl HardwareCache {
         hardware_identifier: Option<String>,
         ty: Option<SensorType>,
     ) -> Vec<(usize, &lhm_sys::Sensor)> {
-        let ty_value: Option<u32> = ty.map(|value| value.into());
+        let ty_value: Option<i32> = ty.map(|value| value.into());
 
         // Lookup the index for the parent item
         let parent_index = match hardware_identifier {

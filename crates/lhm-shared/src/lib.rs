@@ -124,7 +124,7 @@ pub struct Sensor {
     PartialOrd,
     Ord,
 )]
-#[repr(u32)]
+#[repr(i32)]
 pub enum HardwareType {
     Motherboard,
     SuperIO,
@@ -140,7 +140,7 @@ pub enum HardwareType {
     Psu,
     Battery,
     #[num_enum(catch_all)]
-    Unknown(u32),
+    Unknown(i32),
 }
 
 /// Types of sensors
@@ -157,7 +157,7 @@ pub enum HardwareType {
     PartialOrd,
     Ord,
 )]
-#[repr(u32)]
+#[repr(i32)]
 pub enum SensorType {
     Voltage,
     Current,
@@ -180,5 +180,5 @@ pub enum SensorType {
     Conductivity,
     Humidity,
     #[num_enum(catch_all)]
-    Unknown(u32),
+    Unknown(i32),
 }

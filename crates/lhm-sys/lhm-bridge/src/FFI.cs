@@ -111,7 +111,7 @@ public static class FFI
     public static int GetHardwareType(HardwarePtr ptr)
     {
         try { return ptr.getType(); }
-        catch { return 0; }
+        catch { return -1; }
     }
 
     [UnmanagedCallersOnly(EntryPoint = "get_hardware_children", CallConvs = new[] { typeof(CallConvCdecl) })]
@@ -167,7 +167,7 @@ public static class FFI
     public static int GetSensorType(SensorPtr ptr)
     {
         try { return ptr.getType(); }
-        catch { return 0; }
+        catch { return -1; }
     }
 
     [UnmanagedCallersOnly(EntryPoint = "get_sensor_value", CallConvs = new[] { typeof(CallConvCdecl) })]

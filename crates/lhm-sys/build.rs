@@ -1,4 +1,4 @@
-use std::{env, fs, path::Path, process::Command};
+use std::{env, path::Path, process::Command};
 
 #[cfg(all(feature = "static", feature = "dylib"))]
 compile_error!("static and dylib are mutually exclusive and cannot be enabled together");
