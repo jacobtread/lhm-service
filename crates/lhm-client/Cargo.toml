@@ -16,6 +16,10 @@ tokio = { version = "1", features = [] }
 # Shared structures
 lhm-shared = { version = "0.0.0", path = "../lhm-shared" }
 rmp-serde.workspace = true
+tokio-util = { version = "0.7", features = ["codec"] }
+futures-util = { version = "0.3.31", features = ["sink"] }
+parking_lot = "0.12.3"
+thiserror = "2.0.12"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros"] }

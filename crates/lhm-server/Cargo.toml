@@ -18,6 +18,9 @@ rmp-serde = { workspace = true }
 # Async runtime 
 tokio = { version = "1", features = ["rt", "sync"] }
 
+tokio-util = { version = "0.7", features = ["codec"] }
+futures-util = { version = "0.3.31", features = ["sink"] }
+
 # Wide string for creating a security descriptor
 widestring = "1"
 

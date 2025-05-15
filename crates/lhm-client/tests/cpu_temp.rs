@@ -5,7 +5,9 @@ use tokio::time::sleep;
 #[tokio::test]
 #[ignore = "Requires the service to be running"]
 async fn get_cpu_temperature() {
-    let mut client = LHMClient::connect().await.unwrap();
+    let client = LHMClient::connect().await.unwrap();
+
+    println!("Connected to client");
 
     client
         .set_options(ComputerOptions {
@@ -18,13 +20,19 @@ async fn get_cpu_temperature() {
         .await
         .unwrap();
 
+    println!("Set options");
+
     client.update_all().await.unwrap();
+
+    println!("Updated hardware");
 
     // Request all CPU hardware
     let cpus = client
         .query_hardware(None, Some(HardwareType::Cpu))
         .await
         .unwrap();
+
+    println!("Querying hardware");
 
     let cpu = cpus.first().unwrap();
 

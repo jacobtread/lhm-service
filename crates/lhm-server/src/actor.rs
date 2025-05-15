@@ -1,7 +1,6 @@
-use std::collections::HashMap;
-
 use lhm_shared::{ComputerOptions, Hardware, HardwareType, Sensor, SensorType};
 use lhm_sys::Computer;
+use std::collections::HashMap;
 use tokio::sync::{mpsc, oneshot};
 
 #[derive(Clone)]

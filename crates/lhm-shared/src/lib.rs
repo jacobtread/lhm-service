@@ -1,6 +1,8 @@
 use num_enum::{FromPrimitive, IntoPrimitive};
 use serde::{Deserialize, Serialize};
 
+pub mod codec;
+
 pub const PIPE_NAME: &str = r"\\.\pipe\LHMLibreHardwareMonitorService";
 
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]

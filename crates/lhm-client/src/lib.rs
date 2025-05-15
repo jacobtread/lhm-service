@@ -1,61 +1,75 @@
-use interprocess::os::windows::named_pipe::{pipe_mode, tokio::DuplexPipeStream};
-use std::io::ErrorKind;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use codec::LHMFrame;
+use parking_lot::Mutex;
+use pipe::{PipeFuture, PipeTx};
+use std::{
+    collections::HashMap,
+    sync::{
+        Arc,
+        atomic::{AtomicU32, Ordering},
+    },
+};
+use thiserror::Error;
+use tokio::{spawn, sync::oneshot};
+use tokio_util::bytes::Bytes;
 
 pub use lhm_shared::*;
 
-/// Client for accessing the LHM pipe
-pub struct LHMClient {
-    pipe: DuplexPipeStream<pipe_mode::Bytes>,
+mod pipe;
+
+/// Handle to send requests through a [LHMClient]
+#[derive(Clone)]
+pub struct LHMClientHandle {
+    tx: PipeTx,
+    subscriptions: Arc<Subscriptions>,
 }
 
-impl LHMClient {
-    /// Connect to the pipe
-    pub async fn connect() -> std::io::Result<Self> {
-        let pipe = DuplexPipeStream::<pipe_mode::Bytes>::connect_by_path(PIPE_NAME).await?;
-        Ok(Self { pipe })
-    }
+#[derive(Debug, Error)]
+pub enum LHMClientError {
+    #[error(transparent)]
+    Encode(rmp_serde::encode::Error),
+    #[error(transparent)]
+    Decode(rmp_serde::decode::Error),
+    #[error("client request handler has closed")]
+    SendError,
+    #[error("client response channel has closed")]
+    RecvError,
+    #[error("server error: {0}")]
+    Server(String),
+    #[error("unexpected message")]
+    UnexpectedMessage,
+}
 
-    async fn send(&mut self, request: PipeRequest) -> std::io::Result<()> {
-        let data_bytes = rmp_serde::to_vec(&request)
-            .map_err(|err| std::io::Error::new(ErrorKind::Other, err))?;
-        let length = data_bytes.len() as u32;
-        let length_bytes = length.to_be_bytes();
+impl LHMClientHandle {
+    async fn send_request(&self, request: PipeRequest) -> Result<PipeResponse, LHMClientError> {
+        let body = rmp_serde::to_vec(&request).map_err(LHMClientError::Encode)?;
+        let body = Bytes::from(body);
 
-        // Write the length
-        self.pipe.write_all(&length_bytes).await?;
-        // Write the actual message
-        self.pipe.write_all(&data_bytes).await?;
+        let (tx, rx) = oneshot::channel();
+        let id = self.subscriptions.insert(tx);
 
-        // Flush the whole message
-        self.pipe.flush().await?;
+        if self.tx.send(LHMFrame { id, body }).is_err() {
+            self.subscriptions.remove(id);
+            return Err(LHMClientError::SendError);
+        }
 
-        Ok(())
-    }
+        let frame = rx.await.map_err(|_| LHMClientError::RecvError)?;
+        let msg: PipeResponse =
+            rmp_serde::from_slice(&frame.body).map_err(LHMClientError::Decode)?;
 
-    async fn recv(&mut self) -> std::io::Result<PipeResponse> {
-        let mut len_buffer = [0u8; 4];
-
-        // Read the length of the payload
-        self.pipe.read_exact(&mut len_buffer).await?;
-        let length = u32::from_be_bytes(len_buffer) as usize;
-
-        // Read the entire payload
-        let mut data_buffer = vec![0u8; length];
-        self.pipe.read_exact(&mut data_buffer).await?;
-
-        let response: PipeResponse = rmp_serde::from_slice(&data_buffer)
-            .map_err(|err| std::io::Error::new(ErrorKind::Other, err))?;
-        Ok(response)
+        match msg {
+            PipeResponse::Error { error } => Err(LHMClientError::Server(error)),
+            msg => Ok(msg),
+        }
     }
 
     /// Set the options for the computer (Which information to request)
-    pub async fn set_options(&mut self, options: ComputerOptions) -> std::io::Result<()> {
-        self.send(PipeRequest::SetOptions { options }).await?;
-        match self.recv().await? {
+    pub async fn set_options(&self, options: ComputerOptions) -> Result<(), LHMClientError> {
+        match self
+            .send_request(PipeRequest::SetOptions { options })
+            .await?
+        {
             PipeResponse::Success => Ok(()),
-            PipeResponse::Error { error } => Err(std::io::Error::new(ErrorKind::Other, error)),
-            _ => Err(std::io::Error::new(ErrorKind::Other, "unexpected message")),
+            _ => Err(LHMClientError::UnexpectedMessage),
         }
     }
 
@@ -63,12 +77,10 @@ impl LHMClient {
     ///
     /// This is required before you can call any querying or getter
     /// functions for hardware or sensors
-    pub async fn update_all(&mut self) -> std::io::Result<()> {
-        self.send(PipeRequest::UpdateAll).await?;
-        match self.recv().await? {
+    pub async fn update_all(&self) -> Result<(), LHMClientError> {
+        match self.send_request(PipeRequest::UpdateAll).await? {
             PipeResponse::Success => Ok(()),
-            PipeResponse::Error { error } => Err(std::io::Error::new(ErrorKind::Other, error)),
-            _ => Err(std::io::Error::new(ErrorKind::Other, "unexpected message")),
+            _ => Err(LHMClientError::UnexpectedMessage),
         }
     }
 
@@ -76,12 +88,13 @@ impl LHMClient {
     ///
     /// You must call [Self::update_all] at least once before
     /// you will get a [Some] value
-    pub async fn get_hardware_by_id(&mut self, id: String) -> std::io::Result<Option<Hardware>> {
-        self.send(PipeRequest::GetHardwareById { id }).await?;
-        match self.recv().await? {
+    pub async fn get_hardware_by_id(&self, id: String) -> Result<Option<Hardware>, LHMClientError> {
+        match self
+            .send_request(PipeRequest::GetHardwareById { id })
+            .await?
+        {
             PipeResponse::Hardware { hardware } => Ok(hardware),
-            PipeResponse::Error { error } => Err(std::io::Error::new(ErrorKind::Other, error)),
-            _ => Err(std::io::Error::new(ErrorKind::Other, "unexpected message")),
+            _ => Err(LHMClientError::UnexpectedMessage),
         }
     }
 
@@ -90,26 +103,27 @@ impl LHMClient {
     /// `parent_id` Filters only to hardware are children of a hardware with a specific ID
     /// `ty` Filters only to hardware of a specific type
     pub async fn query_hardware(
-        &mut self,
+        &self,
         parent_id: Option<String>,
         ty: Option<HardwareType>,
-    ) -> std::io::Result<Vec<Hardware>> {
-        self.send(PipeRequest::QueryHardware { parent_id, ty })
-            .await?;
-        match self.recv().await? {
+    ) -> Result<Vec<Hardware>, LHMClientError> {
+        match self
+            .send_request(PipeRequest::QueryHardware { parent_id, ty })
+            .await?
+        {
             PipeResponse::Hardwares { hardware } => Ok(hardware),
-            PipeResponse::Error { error } => Err(std::io::Error::new(ErrorKind::Other, error)),
-            _ => Err(std::io::Error::new(ErrorKind::Other, "unexpected message")),
+            _ => Err(LHMClientError::UnexpectedMessage),
         }
     }
 
     /// Updates a specific hardware item by ID
-    pub async fn update_hardware_by_id(&mut self, id: String) -> std::io::Result<()> {
-        self.send(PipeRequest::UpdateHardwareById { id }).await?;
-        match self.recv().await? {
+    pub async fn update_hardware_by_id(&self, id: String) -> Result<(), LHMClientError> {
+        match self
+            .send_request(PipeRequest::UpdateHardwareById { id })
+            .await?
+        {
             PipeResponse::Success => Ok(()),
-            PipeResponse::Error { error } => Err(std::io::Error::new(ErrorKind::Other, error)),
-            _ => Err(std::io::Error::new(ErrorKind::Other, "unexpected message")),
+            _ => Err(LHMClientError::UnexpectedMessage),
         }
     }
 
@@ -120,23 +134,21 @@ impl LHMClient {
     ///
     /// Note: Cache indexes will change each time [Self::update_all] is called
     /// you must ensure you obtain the latest cache index.
-    pub async fn update_hardware_by_idx(&mut self, idx: usize) -> std::io::Result<()> {
-        self.send(PipeRequest::UpdateHardwareByIndex { idx })
-            .await?;
-        match self.recv().await? {
+    pub async fn update_hardware_by_idx(&self, idx: usize) -> Result<(), LHMClientError> {
+        match self
+            .send_request(PipeRequest::UpdateHardwareByIndex { idx })
+            .await?
+        {
             PipeResponse::Success => Ok(()),
-            PipeResponse::Error { error } => Err(std::io::Error::new(ErrorKind::Other, error)),
-            _ => Err(std::io::Error::new(ErrorKind::Other, "unexpected message")),
+            _ => Err(LHMClientError::UnexpectedMessage),
         }
     }
 
     /// Get a specific sensor by ID
-    pub async fn get_sensor_by_id(&mut self, id: String) -> std::io::Result<Option<Sensor>> {
-        self.send(PipeRequest::GetSensorById { id }).await?;
-        match self.recv().await? {
+    pub async fn get_sensor_by_id(&self, id: String) -> Result<Option<Sensor>, LHMClientError> {
+        match self.send_request(PipeRequest::GetSensorById { id }).await? {
             PipeResponse::Sensor { sensor } => Ok(sensor),
-            PipeResponse::Error { error } => Err(std::io::Error::new(ErrorKind::Other, error)),
-            _ => Err(std::io::Error::new(ErrorKind::Other, "unexpected message")),
+            _ => Err(LHMClientError::UnexpectedMessage),
         }
     }
 
@@ -145,16 +157,16 @@ impl LHMClient {
     /// If `update` true is provided the sensor will be updated before
     /// querying   
     pub async fn get_sensor_value_by_id(
-        &mut self,
+        &self,
         id: String,
         update: bool,
-    ) -> std::io::Result<Option<f32>> {
-        self.send(PipeRequest::GetSensorValueById { id, update })
-            .await?;
-        match self.recv().await? {
+    ) -> Result<Option<f32>, LHMClientError> {
+        match self
+            .send_request(PipeRequest::GetSensorValueById { id, update })
+            .await?
+        {
             PipeResponse::SensorValue { value } => Ok(value),
-            PipeResponse::Error { error } => Err(std::io::Error::new(ErrorKind::Other, error)),
-            _ => Err(std::io::Error::new(ErrorKind::Other, "unexpected message")),
+            _ => Err(LHMClientError::UnexpectedMessage),
         }
     }
 
@@ -166,16 +178,16 @@ impl LHMClient {
     /// Note: Cache indexes will change each time [Self::update_all] is called
     /// you must ensure you obtain the latest cache index.
     pub async fn get_sensor_value_by_idx(
-        &mut self,
+        &self,
         idx: usize,
         update: bool,
-    ) -> std::io::Result<Option<f32>> {
-        self.send(PipeRequest::GetSensorValueByIndex { idx, update })
-            .await?;
-        match self.recv().await? {
+    ) -> Result<Option<f32>, LHMClientError> {
+        match self
+            .send_request(PipeRequest::GetSensorValueByIndex { idx, update })
+            .await?
+        {
             PipeResponse::SensorValue { value } => Ok(value),
-            PipeResponse::Error { error } => Err(std::io::Error::new(ErrorKind::Other, error)),
-            _ => Err(std::io::Error::new(ErrorKind::Other, "unexpected message")),
+            _ => Err(LHMClientError::UnexpectedMessage),
         }
     }
 
@@ -184,26 +196,27 @@ impl LHMClient {
     /// `parent_id` Filters only to sensors are children of a hardware with a specific ID
     /// `ty` Filters only to sensor of a specific type
     pub async fn query_sensors(
-        &mut self,
+        &self,
         parent_id: Option<String>,
         ty: Option<SensorType>,
-    ) -> std::io::Result<Vec<Sensor>> {
-        self.send(PipeRequest::QuerySensors { parent_id, ty })
-            .await?;
-        match self.recv().await? {
+    ) -> Result<Vec<Sensor>, LHMClientError> {
+        match self
+            .send_request(PipeRequest::QuerySensors { parent_id, ty })
+            .await?
+        {
             PipeResponse::Sensors { sensors } => Ok(sensors),
-            PipeResponse::Error { error } => Err(std::io::Error::new(ErrorKind::Other, error)),
-            _ => Err(std::io::Error::new(ErrorKind::Other, "unexpected message")),
+            _ => Err(LHMClientError::UnexpectedMessage),
         }
     }
 
     /// Updates a specific sensor item by ID
-    pub async fn update_sensor_by_id(&mut self, id: String) -> std::io::Result<()> {
-        self.send(PipeRequest::UpdateSensorById { id }).await?;
-        match self.recv().await? {
+    pub async fn update_sensor_by_id(&self, id: String) -> Result<(), LHMClientError> {
+        match self
+            .send_request(PipeRequest::UpdateSensorById { id })
+            .await?
+        {
             PipeResponse::Success => Ok(()),
-            PipeResponse::Error { error } => Err(std::io::Error::new(ErrorKind::Other, error)),
-            _ => Err(std::io::Error::new(ErrorKind::Other, "unexpected message")),
+            _ => Err(LHMClientError::UnexpectedMessage),
         }
     }
 
@@ -214,12 +227,70 @@ impl LHMClient {
     ///
     /// Note: Cache indexes will change each time [Self::update_all] is called
     /// you must ensure you obtain the latest cache index.
-    pub async fn update_sensor_by_idx(&mut self, idx: usize) -> std::io::Result<()> {
-        self.send(PipeRequest::UpdateSensorByIndex { idx }).await?;
-        match self.recv().await? {
+    pub async fn update_sensor_by_idx(&self, idx: usize) -> Result<(), LHMClientError> {
+        match self
+            .send_request(PipeRequest::UpdateSensorByIndex { idx })
+            .await?
+        {
             PipeResponse::Success => Ok(()),
-            PipeResponse::Error { error } => Err(std::io::Error::new(ErrorKind::Other, error)),
-            _ => Err(std::io::Error::new(ErrorKind::Other, "unexpected message")),
+            _ => Err(LHMClientError::UnexpectedMessage),
         }
+    }
+}
+
+#[derive(Default)]
+struct Subscriptions {
+    id: AtomicU32,
+    value: Mutex<HashMap<u32, oneshot::Sender<LHMFrame>>>,
+}
+
+impl Subscriptions {
+    pub fn insert(&self, tx: oneshot::Sender<LHMFrame>) -> u32 {
+        let id = self.id.fetch_add(1, Ordering::AcqRel);
+        self.value.lock().insert(id, tx);
+        id
+    }
+
+    pub fn invoke(&self, id: u32, msg: LHMFrame) {
+        if let Some(tx) = self.value.lock().remove(&id) {
+            _ = tx.send(msg);
+        }
+    }
+
+    pub fn remove(&self, id: u32) {
+        self.value.lock().remove(&id);
+    }
+}
+
+/// Client for accessing the LHM service pipe
+pub struct LHMClient;
+
+impl LHMClient {
+    /// Connect to the LHM service
+    pub async fn connect() -> std::io::Result<LHMClientHandle> {
+        let subscriptions = Arc::new(Subscriptions::default());
+        let (future, rx, tx) = PipeFuture::connect().await?;
+
+        spawn(async move {
+            if let Err(err) = future.await {
+                // TODO:
+                eprintln!("{err}")
+            }
+        });
+
+        spawn({
+            let subscriptions = subscriptions.clone();
+            let mut rx = rx;
+
+            async move {
+                while let Some(frame) = rx.recv().await {
+                    subscriptions.invoke(frame.id, frame);
+                }
+            }
+        });
+
+        let handle = LHMClientHandle { subscriptions, tx };
+
+        Ok(handle)
     }
 }
