@@ -31,4 +31,4 @@ windows-service = "0.7"
 lhm-shared = { version = "0.0.0", path = "../lhm-shared" }
 
 # Core library
-lhm-sys = { version = "0.0.0", path = "../lhm-sys" }
+lhm-sys-static = { version = "0.0.0", path = "../lhm-sys-static" }

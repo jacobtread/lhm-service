@@ -44,7 +44,7 @@ async fn get_cpu_temperature() {
 
     println!("CPU is initially {}°C", temp_sensor.value);
 
-    for _ in 0..15 {
+    for _ in 0..5 {
         // Get the current sensor value
         let value = client
             .get_sensor_value_by_idx(temp_sensor.index, true)

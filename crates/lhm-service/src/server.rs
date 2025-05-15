@@ -4,17 +4,12 @@ use interprocess::os::windows::named_pipe::{PipeListenerOptions, pipe_mode};
 use interprocess::os::windows::security_descriptor::SecurityDescriptor;
 use lhm_shared::PipeResponse;
 use lhm_shared::{PIPE_NAME, PipeRequest};
-use lhm_sys::{Api, SharedApi};
 use std::io::ErrorKind;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::task::spawn_local;
 use widestring::U16CString;
 
 pub async fn run_server() -> std::io::Result<()> {
-    let bridge = Api::load()
-        // Handle load error
-        .map_err(|err| std::io::Error::new(ErrorKind::Other, err))?;
-
     let listener = PipeListenerOptions::new()
         .mode(interprocess::os::windows::named_pipe::PipeMode::Bytes)
         .security_descriptor(Some(SecurityDescriptor::deserialize(
@@ -25,7 +20,7 @@ pub async fn run_server() -> std::io::Result<()> {
 
     loop {
         let stream = listener.accept().await?;
-        spawn_local(handle_pipe_stream(bridge.clone(), stream));
+        spawn_local(handle_pipe_stream(stream));
     }
 }
 
@@ -85,9 +80,9 @@ pub async fn handle_request(
     }
 }
 
-pub async fn handle_pipe_stream(bridge: SharedApi, mut stream: DuplexPipeStream<pipe_mode::Bytes>) {
+pub async fn handle_pipe_stream(mut stream: DuplexPipeStream<pipe_mode::Bytes>) {
     // Initialize an actor
-    let handle = ComputerActor::create(bridge);
+    let handle = ComputerActor::create();
 
     loop {
         let request: PipeRequest = match recv_message(&mut stream).await {

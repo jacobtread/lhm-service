@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 
 use lhm_shared::{ComputerOptions, Hardware, HardwareType, Sensor, SensorType};
+use lhm_sys_static::{self as lhm_sys, Computer};
 use tokio::sync::{mpsc, oneshot};
-
-use lhm_sys::{Computer, SharedApi};
 
 #[derive(Clone)]
 pub struct ComputerActorHandle {
@@ -454,12 +453,12 @@ impl HardwareCache {
 }
 
 impl ComputerActor {
-    pub fn create(bridge: SharedApi) -> ComputerActorHandle {
+    pub fn create() -> ComputerActorHandle {
         let (tx, rx) = mpsc::unbounded_channel();
 
         std::thread::spawn(move || {
             // Run service
-            let computer = match Computer::create(bridge) {
+            let computer = match Computer::create() {
                 Ok(value) => value,
                 Err(err) => {
                     eprintln!("failed to start computer service: {err}");

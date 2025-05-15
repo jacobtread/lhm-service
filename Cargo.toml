@@ -5,6 +5,7 @@ members = [
     "crates/lhm-service",
     "crates/lhm-client",
     "crates/lhm-sys",
+    "crates/lhm-sys-static",
 ]
 
 [workspace.dependencies]
