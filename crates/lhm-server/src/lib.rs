@@ -1,37 +1,125 @@
 use crate::actor::{ComputerActor, ComputerActorHandle};
-use futures_util::{SinkExt, StreamExt};
-use interprocess::os::windows::named_pipe::tokio::{DuplexPipeStream, PipeListenerOptionsExt};
-use interprocess::os::windows::named_pipe::{PipeListenerOptions, pipe_mode};
-use interprocess::os::windows::security_descriptor::SecurityDescriptor;
-use lhm_shared::PipeResponse;
-use lhm_shared::codec::{LHMFrame, LHMFrameCodec};
-use lhm_shared::{PIPE_NAME, PipeRequest};
-use std::io::ErrorKind;
-use tokio::task::spawn_local;
-use tokio_util::bytes::Bytes;
-use tokio_util::codec::Framed;
+use actor::ComputerActorMessage;
+use interprocess::os::windows::{
+    named_pipe::{
+        PipeListenerOptions, pipe_mode,
+        tokio::{DuplexPipeStream, PipeListenerOptionsExt},
+    },
+    security_descriptor::SecurityDescriptor,
+};
+use lhm_shared::{
+    PIPE_NAME, PipeRequest, PipeResponse,
+    codec::{LHMFrame, LHMFrameCodec},
+};
+use pipe::{PipeFuture, PipeTx};
+use tokio::spawn;
+use tokio_util::{bytes::Bytes, codec::Framed};
 use widestring::U16CString;
+mod pipe;
 
 mod actor;
 
+/// Run the server
 pub async fn run_server() -> std::io::Result<()> {
+    // Security descriptor that allows user-land programs to access the pipe
+    let security_descriptor = SecurityDescriptor::deserialize(
+        U16CString::from_str_truncate("D:(A;;GA;;;WD)").as_ucstr(),
+    )?;
+
+    // Create the pipe
     let listener = PipeListenerOptions::new()
         .mode(interprocess::os::windows::named_pipe::PipeMode::Bytes)
-        .security_descriptor(Some(SecurityDescriptor::deserialize(
-            U16CString::from_str_truncate("D:(A;;GA;;;WD)").as_ucstr(),
-        )?))
+        .security_descriptor(Some(security_descriptor))
         .path(PIPE_NAME)
         .create_tokio_duplex::<pipe_mode::Bytes>()?;
 
     loop {
         let stream = listener.accept().await?;
-        spawn_local(handle_pipe_stream(stream));
+        handle_pipe_stream(stream);
     }
 }
 
-pub async fn handle_request(
+pub type Pipe = Framed<DuplexPipeStream<pipe_mode::Bytes>, LHMFrameCodec>;
+
+pub fn handle_pipe_stream(stream: DuplexPipeStream<pipe_mode::Bytes>) {
+    // Initialize an actor
+    let handle = ComputerActor::create();
+    let pipe = Framed::new(stream, LHMFrameCodec::default());
+
+    let (future, mut rx, tx) = PipeFuture::new(pipe);
+
+    spawn(future);
+    spawn(async move {
+        while let Some(frame) = rx.recv().await {
+            handle_frame(frame, &handle, &tx);
+        }
+    });
+}
+
+fn handle_frame(frame: LHMFrame, handle: &ComputerActorHandle, tx: &PipeTx) {
+    let request = rmp_serde::from_slice(&frame.body)
+        // Translate error type
+        .map_err(|err| {
+            let error = err.to_string();
+            PipeResponse::Error { error }
+        });
+
+    let request: PipeRequest = match request {
+        Ok(value) => value,
+        Err(err) => {
+            let frame = match serialize_frame(frame.id, err) {
+                Ok(value) => value,
+                Err(_cause) => {
+                    // Nothing we can do here
+                    return;
+                }
+            };
+
+            _ = tx.send(frame);
+
+            return;
+        }
+    };
+
+    spawn(handle_request(
+        frame.id,
+        request,
+        handle.clone(),
+        tx.clone(),
+    ));
+}
+
+async fn handle_request(id: u32, request: PipeRequest, handle: ComputerActorHandle, tx: PipeTx) {
+    let response = handle_request_inner(request, handle)
+        .await
+        // Create a error response
+        .unwrap_or_else(|err| {
+            let error = err.to_string();
+            PipeResponse::Error { error }
+        });
+
+    let frame = match serialize_frame(id, response) {
+        Ok(value) => value,
+        Err(_cause) => {
+            // Nothing we can do here
+            return;
+        }
+    };
+
+    _ = tx.send(frame);
+}
+
+fn serialize_frame(id: u32, message: PipeResponse) -> Result<LHMFrame, rmp_serde::encode::Error> {
+    let data_bytes = rmp_serde::to_vec(&message)?;
+    Ok(LHMFrame {
+        id,
+        body: Bytes::from(data_bytes),
+    })
+}
+
+pub async fn handle_request_inner(
     request: PipeRequest,
-    handle: &ComputerActorHandle,
+    handle: ComputerActorHandle,
 ) -> anyhow::Result<PipeResponse> {
     match request {
         PipeRequest::UpdateAll => {
@@ -83,74 +171,4 @@ pub async fn handle_request(
             Ok(PipeResponse::Success)
         }
     }
-}
-
-pub type Pipe = Framed<DuplexPipeStream<pipe_mode::Bytes>, LHMFrameCodec>;
-
-pub async fn handle_pipe_stream(stream: DuplexPipeStream<pipe_mode::Bytes>) {
-    // Initialize an actor
-    let handle = ComputerActor::create();
-    let mut pipe = Framed::new(stream, LHMFrameCodec::default());
-
-    loop {
-        let frame: LHMFrame = match pipe.next().await {
-            Some(Ok(value)) => value,
-
-            // Cannot reply to malformed frames
-            Some(Err(_)) => return,
-
-            // Stream has ended
-            None => return,
-        };
-
-        let data: PipeRequest = match rmp_serde::from_slice(&frame.body)
-            .map_err(|err| std::io::Error::new(ErrorKind::Other, err))
-        {
-            Ok(value) => value,
-            Err(err) => {
-                let error = err.to_string();
-                return {
-                    if send_message(&mut pipe, frame.id, PipeResponse::Error { error })
-                        .await
-                        .is_err()
-                    {
-                        return;
-                    }
-                };
-            }
-        };
-
-        match handle_request(data, &handle).await {
-            Ok(response) => {
-                if send_message(&mut pipe, frame.id, response).await.is_err() {
-                    return;
-                }
-            }
-            Err(err) => {
-                let error = err.to_string();
-                if send_message(&mut pipe, frame.id, PipeResponse::Error { error })
-                    .await
-                    .is_err()
-                {
-                    return;
-                }
-            }
-        }
-    }
-}
-
-async fn send_message(pipe: &mut Pipe, id: u32, request: PipeResponse) -> std::io::Result<()> {
-    let data_bytes =
-        rmp_serde::to_vec(&request).map_err(|err| std::io::Error::new(ErrorKind::Other, err))?;
-
-    pipe.send(LHMFrame {
-        id,
-        body: Bytes::from(data_bytes),
-    })
-    .await?;
-
-    // Flush the whole message
-    pipe.flush().await?;
-
-    Ok(())
 }
