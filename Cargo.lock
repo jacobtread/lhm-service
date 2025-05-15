@@ -179,7 +179,6 @@ dependencies = [
 name = "lhm-server"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "futures-util",
  "interprocess",
  "lhm-shared",

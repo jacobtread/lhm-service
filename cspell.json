@@ -4,9 +4,11 @@
     "Conv",
     "Convs",
     "interprocess",
+    "Jacobtread",
     "lhwm",
     "oneshot",
     "repr",
+    "serde",
     "ucstr",
     "widestring",
     "winget"

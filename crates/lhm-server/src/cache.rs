@@ -1,6 +1,5 @@
-use std::collections::HashMap;
-
 use lhm_shared::{HardwareType, SensorType};
+use std::collections::HashMap;
 
 /// Cache holding the currently loaded hardware and sensors
 /// in a fashion that is easily queryable with all sensors

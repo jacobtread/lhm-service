@@ -1,5 +1,4 @@
-use crate::actor::{ComputerActor, ComputerActorHandle};
-use actor::ComputerActorMessage;
+use actor::{ComputerActor, ComputerActorHandle, ComputerActorMessage};
 use interprocess::os::windows::{
     named_pipe::{
         PipeListenerOptions, pipe_mode,
@@ -46,65 +45,41 @@ pub fn handle_pipe_stream(stream: DuplexPipeStream<pipe_mode::Bytes>) {
     // Initialize an actor
     let handle = match ComputerActor::create() {
         Ok(value) => value,
-        Err(_cause) => {
-            return;
-        }
+        Err(_cause) => return,
     };
 
     let pipe = Framed::new(stream, LHMFrameCodec::default());
-
     let (future, mut rx, tx) = PipeFuture::new(pipe);
 
+    // Spawn task to handle the pipe itself
     spawn(future);
+
+    // Spawn task to handle messages from the pipe
     spawn(async move {
         while let Some(frame) = rx.recv().await {
-            handle_frame(frame, &handle, &tx);
+            let handle = handle.clone();
+            let tx = tx.clone();
+
+            spawn(handle_frame(frame, handle, tx));
         }
     });
 }
 
-fn handle_frame(frame: LHMFrame, handle: &ComputerActorHandle, tx: &PipeTx) {
-    let request = rmp_serde::from_slice(&frame.body)
-        // Translate error type
-        .map_err(|err| {
+async fn handle_frame(frame: LHMFrame, handle: ComputerActorHandle, tx: PipeTx) {
+    let request = rmp_serde::from_slice(&frame.body);
+    let response = match request {
+        // Handle the request
+        Ok(request) => handle_request(request, handle)
+            .await
+            .unwrap_or_else(|err| err),
+        // Failed to parse the request
+        Err(err) => {
             let error = err.to_string();
             PipeResponse::Error { error }
-        });
-
-    let request: PipeRequest = match request {
-        Ok(value) => value,
-        Err(err) => {
-            let frame = match serialize_frame(frame.id, err) {
-                Ok(value) => value,
-                Err(_cause) => {
-                    // Nothing we can do here
-                    return;
-                }
-            };
-
-            _ = tx.send(frame);
-            return;
         }
     };
 
-    spawn(handle_request(
-        frame.id,
-        request,
-        handle.clone(),
-        tx.clone(),
-    ));
-}
-
-async fn handle_request(id: u32, request: PipeRequest, handle: ComputerActorHandle, tx: PipeTx) {
-    let response = handle_request_inner(request, handle)
-        .await
-        // Create a error response
-        .unwrap_or_else(|err| {
-            let error = err.to_string();
-            PipeResponse::Error { error }
-        });
-
-    let frame = match serialize_frame(id, response) {
+    let response_bytes = match rmp_serde::to_vec(&response) {
         Ok(value) => value,
         Err(_cause) => {
             // Nothing we can do here
@@ -112,23 +87,28 @@ async fn handle_request(id: u32, request: PipeRequest, handle: ComputerActorHand
         }
     };
 
-    _ = tx.send(frame);
+    _ = tx.send(LHMFrame {
+        id: frame.id,
+        body: Bytes::from(response_bytes),
+    });
 }
 
-fn serialize_frame(id: u32, message: PipeResponse) -> Result<LHMFrame, rmp_serde::encode::Error> {
-    let data_bytes = rmp_serde::to_vec(&message)?;
-    Ok(LHMFrame {
-        id,
-        body: Bytes::from(data_bytes),
-    })
-}
-
-pub async fn handle_request_inner(
+async fn handle_request(
     request: PipeRequest,
     handle: ComputerActorHandle,
-) -> anyhow::Result<PipeResponse> {
+) -> Result<PipeResponse, PipeResponse> {
     let (tx, rx) = oneshot::channel();
-    handle.tx.send(ComputerActorMessage { request, tx })?;
-    let response = rx.await?;
+
+    handle
+        .tx
+        .send(ComputerActorMessage { request, tx })
+        .map_err(|_| PipeResponse::Error {
+            error: "request actor is closed".to_string(),
+        })?;
+
+    let response = rx.await.map_err(|_| PipeResponse::Error {
+        error: "request actor is closed".to_string(),
+    })?;
+
     Ok(response)
 }

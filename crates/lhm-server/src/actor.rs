@@ -1,8 +1,7 @@
+use crate::cache::HardwareCache;
 use lhm_shared::{Hardware, HardwareType, PipeRequest, PipeResponse, Sensor, SensorType};
 use lhm_sys::Computer;
 use tokio::sync::{mpsc, oneshot};
-
-use crate::cache::HardwareCache;
 
 #[derive(Clone)]
 pub struct ComputerActorHandle {

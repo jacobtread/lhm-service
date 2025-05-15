@@ -1,5 +1,6 @@
 use futures_util::{SinkExt, StreamExt};
 use interprocess::os::windows::named_pipe::{pipe_mode, tokio::DuplexPipeStream};
+use lhm_shared::codec::{LHMFrame, LHMFrameCodec};
 use std::{
     future::Future,
     pin::Pin,
@@ -7,8 +8,6 @@ use std::{
 };
 use tokio::sync::mpsc;
 use tokio_util::codec::Framed;
-
-use lhm_shared::codec::{LHMFrame, LHMFrameCodec};
 
 pub type Pipe = Framed<DuplexPipeStream<pipe_mode::Bytes>, LHMFrameCodec>;
 
