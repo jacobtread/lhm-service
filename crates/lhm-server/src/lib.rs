@@ -15,9 +15,10 @@ use pipe::{PipeFuture, PipeTx};
 use tokio::{spawn, sync::oneshot};
 use tokio_util::{bytes::Bytes, codec::Framed};
 use widestring::U16CString;
-mod pipe;
 
 mod actor;
+mod cache;
+mod pipe;
 
 /// Run the server
 pub async fn run_server() -> std::io::Result<()> {
