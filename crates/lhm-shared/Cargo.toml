@@ -1,12 +1,12 @@
 [package]
 name = "lhm-shared"
-version = "0.0.0"
+version = "0.1.0"
 edition = "2024"
 license = "MIT"
 authors = ["Jacobtread <jacobtread@gmail.com>"]
 repository = "https://github.com/jacobtread/lhm-service"
 readme = "README.md"
-description = "Shared structures used between lhm-client, lhm-service, and lhm-sys"
+description = "Shared structures used between lhm-client, lhm-server, and lhm-sys"
 
 [dependencies]
 num_enum = "0.7.3"
