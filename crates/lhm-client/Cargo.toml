@@ -1,6 +1,6 @@
 [package]
 name = "lhm-client"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 license = "MIT"
 authors = ["Jacobtread <jacobtread@gmail.com>"]
@@ -14,7 +14,7 @@ rmp-serde = { workspace = true }
 tokio = { version = "1", features = [] }
 
 # Shared structures
-lhm-shared = { version = "0.1.0", path = "../lhm-shared" }
+lhm-shared = { version = "0.2.0", path = "../lhm-shared" }
 
 tokio-util = { version = "0.7", features = ["codec"] }
 futures-util = { version = "0.3.31", features = ["sink"] }

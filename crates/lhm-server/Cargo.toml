@@ -1,6 +1,6 @@
 [package]
 name = "lhm-server"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 license = "MIT"
 authors = ["Jacobtread <jacobtread@gmail.com>"]
@@ -26,7 +26,7 @@ futures-util = { version = "0.3", features = ["sink"] }
 widestring = "1"
 
 # Shared helpers
-lhm-shared = { version = "0.1.0", path = "../lhm-shared" }
+lhm-shared = { version = "0.2.0", path = "../lhm-shared" }
 
 # Core library
 lhm-sys = { version = "0.1.0", path = "../lhm-sys" }

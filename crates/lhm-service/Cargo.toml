@@ -1,6 +1,6 @@
 [package]
 name = "lhm-service"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 license = "MIT"
 authors = ["Jacobtread <jacobtread@gmail.com>"]
@@ -19,4 +19,4 @@ tokio = { version = "1", features = ["rt", "sync"] }
 windows-service = "0.7"
 
 # Server to handle requests
-lhm-server = { version = "0.1.0", path = "../lhm-server" }
+lhm-server = { version = "0.2.0", path = "../lhm-server" }
