@@ -110,7 +110,7 @@ impl HardwareCache {
     /// optionally where the type or parent_id matches
     pub fn query_hardware_iter(
         &self,
-        parent_index: Option<usize>,
+        parent_index: Option<Option<usize>>,
         ty: Option<HardwareType>,
     ) -> impl Iterator<Item = (usize, &lhm_sys::Hardware)> + '_ {
         let ty_value: Option<i32> = ty.map(|value| value.into());
@@ -128,11 +128,7 @@ impl HardwareCache {
                 }
 
                 // Filter by parent
-                if parent_index.is_some_and(|parent_index: usize| {
-                    hardware
-                        .parent_index
-                        .is_none_or(|value| value != parent_index)
-                }) {
+                if parent_index.is_some_and(|parent_index| parent_index == hardware.parent_index) {
                     return false;
                 }
 

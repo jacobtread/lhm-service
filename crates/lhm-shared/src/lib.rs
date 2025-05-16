@@ -29,7 +29,7 @@ pub enum PipeRequest {
         id: String,
     },
     QueryHardware {
-        parent_id: Option<String>,
+        parent_id: Option<Option<String>>,
         ty: Option<HardwareType>,
     },
     UpdateHardwareById {

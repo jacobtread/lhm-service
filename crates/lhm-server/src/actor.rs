@@ -67,17 +67,26 @@ impl ComputerActor {
             }
 
             PipeRequest::QueryHardware { parent_id, ty } => {
-                // Lookup the index for the parent item
-                let parent_index = match parent_id.map(|id| self.cache.get_hardware_by_id(&id)) {
-                    // Index of the parent item
-                    Some(Some((index, _))) => Some(index),
-                    // Parent hardware did not exist
-                    Some(None) => {
-                        return PipeResponse::Error {
-                            error: "parent not found".to_string(),
+                // Lookup the index for the parent item if one was specified
+                let parent_index = match parent_id {
+                    // Requesting a specific parent ID
+                    Some(Some(parent_id)) => {
+                        let index = match self.cache.get_hardware_by_id(&parent_id) {
+                            Some((index, _)) => index,
+                            None => {
+                                return PipeResponse::Error {
+                                    error: "parent not found".to_string(),
+                                };
+                            }
                         };
+
+                        Some(Some(index))
                     }
-                    // Not requesting a parent index
+
+                    // Requesting no parent ID (Top level hardware)
+                    Some(None) => Some(None),
+
+                    // Allow any parent ID
                     None => None,
                 };
 

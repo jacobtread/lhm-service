@@ -104,7 +104,7 @@ impl LHMClientHandle {
     /// `ty` Filters only to hardware of a specific type
     pub async fn query_hardware(
         &self,
-        parent_id: Option<String>,
+        parent_id: Option<Option<String>>,
         ty: Option<HardwareType>,
     ) -> Result<Vec<Hardware>, LHMClientError> {
         match self
