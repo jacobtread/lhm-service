@@ -1,4 +1,4 @@
-use lhm_client::{ComputerOptions, LHMClient, SensorType};
+use lhm_client::{ComputerOptions, LHMClient};
 
 #[tokio::main]
 async fn main() {
