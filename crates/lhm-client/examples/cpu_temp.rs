@@ -33,33 +33,33 @@ async fn main() {
 
     println!("Querying hardware");
 
-    let cpu = cpu_list.first().unwrap();
-
-    // Request all CPU temperature sensors
-    let cpu_temps = client
-        .query_sensors(Some(cpu.identifier.clone()), Some(SensorType::Temperature))
-        .await
-        .unwrap();
-
-    dbg!(&cpu_temps);
-
-    // Find the package temperature
-    let temp_sensor = cpu_temps
-        .iter()
-        .find(|sensor| sensor.name.eq("CPU Package"))
-        .expect("Missing cpu temp sensor");
-
-    println!("CPU is initially {}°C", temp_sensor.value);
-
-    for _ in 0..5 {
-        // Get the current sensor value
-        let value = client
-            .get_sensor_value_by_idx(temp_sensor.index, true)
+    for cpu in cpu_list {
+        // Request all CPU temperature sensors
+        let cpu_temps = client
+            .query_sensors(Some(cpu.identifier.clone()), Some(SensorType::Temperature))
             .await
-            .unwrap()
-            .expect("cpu temp sensor is now unavailable");
+            .unwrap();
 
-        println!("CPU is now {}°C", value);
-        sleep(Duration::from_secs(1)).await;
+        dbg!(&cpu_temps);
+
+        // Find the package temperature
+        let temp_sensor = cpu_temps
+            .iter()
+            .find(|sensor| sensor.name.eq("CPU Package"))
+            .expect("Missing cpu temp sensor");
+
+        println!("CPU is initially {}°C", temp_sensor.value);
+
+        for _ in 0..5 {
+            // Get the current sensor value
+            let value = client
+                .get_sensor_value_by_idx(temp_sensor.index, true)
+                .await
+                .unwrap()
+                .expect("cpu temp sensor is now unavailable");
+
+            println!("CPU is now {}°C", value);
+            sleep(Duration::from_secs(1)).await;
+        }
     }
 }
