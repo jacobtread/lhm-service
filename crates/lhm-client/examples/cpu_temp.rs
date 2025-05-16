@@ -2,9 +2,8 @@ use lhm_client::{ComputerOptions, HardwareType, LHMClient, SensorType};
 use std::time::Duration;
 use tokio::time::sleep;
 
-#[tokio::test]
-#[ignore = "Requires the service to be running"]
-async fn get_cpu_temperature() {
+#[tokio::main]
+async fn main() {
     let client = LHMClient::connect().await.unwrap();
 
     println!("Connected to client");
