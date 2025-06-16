@@ -118,7 +118,7 @@ impl Computer {
             let err_ptr = unsafe { result.data.err_value };
             let err = copy_string(err_ptr);
 
-            return Err(std::io::Error::new(std::io::ErrorKind::Other, err));
+            return Err(std::io::Error::other(err));
         }
 
         let ptr = unsafe { result.data.ok_value };
