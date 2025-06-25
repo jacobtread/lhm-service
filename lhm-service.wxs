@@ -14,7 +14,7 @@
 
     <StandardDirectory Id="ProgramFilesFolder">
       <Directory Id="INSTALLDIR" Name="LibreHardwareMonitorService">
-        <Component Id="ServiceExe" Feature="ProductFeature">
+        <Component Id="ServiceExe" Feature="ProductFeature" Guid="6c3e1de2-99ea-49f9-b21a-e31062608cbb">
           <!-- Service executable file -->
           <File Id="lhmServiceExe" Source=".\target\release\lhm-service.exe" KeyPath="yes" />
           
@@ -25,7 +25,8 @@
                           Description="Monitors hardware sensors and provides data"
                           Start="auto"
                           Type="ownProcess"
-                          ErrorControl="normal" />
+                          ErrorControl="normal"
+                          Vital="yes" />
 
           <!-- Setup service control -->
           <ServiceControl Id="LHMServiceControl"
