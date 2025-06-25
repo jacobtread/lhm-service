@@ -16,6 +16,9 @@ pub use lhm_shared::*;
 
 mod pipe;
 
+#[cfg(feature = "service")]
+pub mod service;
+
 /// Handle to send requests through a [LHMClient]
 #[derive(Clone)]
 pub struct LHMClientHandle {
