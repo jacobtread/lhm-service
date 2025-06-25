@@ -9,19 +9,19 @@ readme = "README.md"
 description = "Client for using the LHM service"
 
 [dependencies]
-interprocess = { workspace = true }
-rmp-serde = { workspace = true }
-tokio = { version = "1", features = [] }
+interprocess.workspace = true
+rmp-serde.workspace = true
+
+tokio.workspace = true
+tokio-util.workspace = true
+futures-util.workspace = true
+
+thiserror.workspace = true
+
+parking_lot.workspace = true
 
 # Shared structures
 lhm-shared = { version = "0.2.0", path = "../lhm-shared" }
 
-tokio-util = { version = "0.7", features = ["codec"] }
-futures-util = { version = "0.3.31", features = ["sink"] }
-
-parking_lot = "0.12.3"
-
-thiserror = "2"
-
 [dev-dependencies]
-tokio = { version = "1", features = ["macros"] }
+tokio = { workspace = true, features = ["macros"] }

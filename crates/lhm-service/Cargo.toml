@@ -10,13 +10,13 @@ description = "Windows service for running LHM and allowing clients to connect t
 
 [dependencies]
 # Error type
-anyhow = "1"
+anyhow = "=1.0.98"
 
 # Async runtime 
-tokio = { version = "1", features = ["rt", "sync"] }
+tokio = { workspace = true, features = ["rt", "sync"] }
 
 # Windows service library
-windows-service = "0.7"
+windows-service = "=0.8.0"
 
 # Server to handle requests
 lhm-server = { version = "0.2.0", path = "../lhm-server" }

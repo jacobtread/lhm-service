@@ -9,7 +9,7 @@ readme = "README.md"
 description = "Shared structures used between lhm-client, lhm-server, and lhm-sys"
 
 [dependencies]
-num_enum = "0.7.3"
+num_enum = "=0.7.4"
 
-serde = { workspace = true }
-tokio-util = { version = "0.7", features = ["codec"] }
+serde.workspace = true
+tokio-util.workspace = true

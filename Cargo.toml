@@ -13,6 +13,22 @@ members = [
 interprocess = { version = "2.2.3", features = ["tokio"] }
 
 # Serialization for underlying protocol
-serde = { version = "1", features = ["derive"] }
+serde = { version = "=1.0.219", features = ["derive"] }
 
-rmp-serde = "1.3.0"
+# Serde MessagePack
+rmp-serde = "=1.3.0"
+
+# Async runtime
+tokio = "=1.45.1"
+
+# Tokio Utilities
+tokio-util = { version = "=0.7.15", features = ["codec"] }
+
+# Futures Utilities
+futures-util = { version = "=0.3.31", features = ["sink"] }
+
+# Locks
+parking_lot = "=0.12.4"
+
+# Error handling
+thiserror = "=2.0.12"

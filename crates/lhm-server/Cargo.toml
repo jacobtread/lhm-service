@@ -10,20 +10,20 @@ description = "Server for running LHM and allowing clients to connect to it with
 
 [dependencies]
 # Named pipe implementation
-interprocess = { workspace = true }
+interprocess.workspace = true
 
 # Serialization
-rmp-serde = { workspace = true }
+rmp-serde.workspace = true
 
 # Async runtime 
-tokio = { version = "1", features = ["rt", "sync"] }
+tokio = { workspace = true, features = ["rt", "sync"] }
 
 # Protocol framing and async utilities
-tokio-util = { version = "0.7", features = ["codec"] }
-futures-util = { version = "0.3", features = ["sink"] }
+tokio-util.workspace = true
+futures-util.workspace = true
 
 # Wide string for creating a security descriptor
-widestring = "1"
+widestring = "=1.2.0"
 
 # Shared helpers
 lhm-shared = { version = "0.2.0", path = "../lhm-shared" }
