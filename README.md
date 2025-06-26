@@ -50,7 +50,7 @@ winget install Microsoft.DotNet.SDK.8
 
 ### 🧩 lhm-sys (Bridge)
 
-The `lhm-sys` crate serves as a bridge that connects AOT-compiled Rust code to C# through either static linking or a dynamic link library (DLL). This crate builds C# code that interacts with the [LibreHardwareMonitorLib](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor) project and sets up the FFI layer for communication between Rust and C#.
+The `lhm-sys` crate serves as a bridge that connects the Rust code to AOT-compiled C# through either static linking or a dynamic link library (DLL). This crate builds C# code that interacts with the [LibreHardwareMonitorLib](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor) project and sets up the FFI layer for communication between Rust and C#.
 
 ### 🛎️ lhm-service (Service)
 
