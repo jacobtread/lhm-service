@@ -62,7 +62,12 @@ impl Future for PipeFuture {
                 Poll::Ready(Some(result)) => result?,
 
                 // Socket is already closed, cannot ready anything more
-                Poll::Ready(None) => return Poll::Ready(Ok(())),
+                Poll::Ready(None) => {
+                    return Poll::Ready(Err(std::io::Error::new(
+                        std::io::ErrorKind::UnexpectedEof,
+                        "connection closed unexpectedly",
+                    )));
+                }
 
                 // Nothing yet, move onto the write polling
                 Poll::Pending => break,

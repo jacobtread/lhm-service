@@ -58,7 +58,7 @@ async fn main() {
                 .unwrap()
                 .expect("cpu temp sensor is now unavailable");
 
-            println!("CPU is now {}°C", value);
+            println!("CPU is now {value}°C");
             sleep(Duration::from_secs(1)).await;
         }
     }

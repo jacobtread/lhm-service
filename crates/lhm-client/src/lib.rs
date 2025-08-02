@@ -23,7 +23,7 @@ pub mod service;
 #[derive(Clone)]
 pub struct LHMClientHandle {
     tx: PipeTx,
-    subscriptions: Arc<Subscriptions>,
+    state: Arc<ClientState>,
 }
 
 #[derive(Debug, Error)]
@@ -40,22 +40,48 @@ pub enum LHMClientError {
     Server(String),
     #[error("unexpected message")]
     UnexpectedMessage,
+
+    /// Error from the underlying client
+    #[error(transparent)]
+    Client(Arc<std::io::Error>),
 }
 
 impl LHMClientHandle {
+    /// Get an error that has stopped the client if one has occurred
+    pub async fn client_error(&self) -> Option<Arc<std::io::Error>> {
+        self.state.error.lock().await.clone()
+    }
+
     async fn send_request(&self, request: PipeRequest) -> Result<PipeResponse, LHMClientError> {
         let body = rmp_serde::to_vec(&request).map_err(LHMClientError::Encode)?;
         let body = Bytes::from(body);
 
         let (tx, rx) = oneshot::channel();
-        let id = self.subscriptions.insert(tx);
+        let id = self.state.subscriptions.insert(tx);
 
         if self.tx.send(LHMFrame { id, body }).is_err() {
-            self.subscriptions.remove(id);
+            self.state.subscriptions.remove(id);
+
+            // Return the more insightful client error first if available
+            if let Some(err) = self.client_error().await {
+                return Err(LHMClientError::Client(err));
+            }
+
             return Err(LHMClientError::SendError);
         }
 
-        let frame = rx.await.map_err(|_| LHMClientError::RecvError)?;
+        let frame = match rx.await {
+            Ok(value) => value,
+            Err(_) => {
+                // Return the more insightful client error first if available
+                if let Some(err) = self.client_error().await {
+                    return Err(LHMClientError::Client(err));
+                }
+
+                return Err(LHMClientError::RecvError);
+            }
+        };
+
         let msg: PipeResponse =
             rmp_serde::from_slice(&frame.body).map_err(LHMClientError::Decode)?;
 
@@ -63,6 +89,11 @@ impl LHMClientHandle {
             PipeResponse::Error { error } => Err(LHMClientError::Server(error)),
             msg => Ok(msg),
         }
+    }
+
+    /// Check if the underlying connection channel is closed
+    pub fn is_closed(&self) -> bool {
+        self.tx.is_closed()
     }
 
     /// Set the options for the computer (Which information to request)
@@ -241,6 +272,13 @@ impl LHMClientHandle {
     }
 }
 
+struct ClientState {
+    /// Subscriptions state
+    subscriptions: Subscriptions,
+    /// Error that has occurred on the connection and is irrecoverable from
+    error: tokio::sync::Mutex<Option<Arc<std::io::Error>>>,
+}
+
 #[derive(Default)]
 struct Subscriptions {
     id: AtomicU32,
@@ -263,6 +301,10 @@ impl Subscriptions {
     pub fn remove(&self, id: u32) {
         self.value.lock().remove(&id);
     }
+
+    pub fn clear(&self) {
+        self.value.lock().clear();
+    }
 }
 
 /// Client for accessing the LHM service pipe
@@ -271,28 +313,41 @@ pub struct LHMClient;
 impl LHMClient {
     /// Connect to the LHM service
     pub async fn connect() -> std::io::Result<LHMClientHandle> {
-        let subscriptions = Arc::new(Subscriptions::default());
+        let subscriptions = Subscriptions::default();
+        let state = Arc::new(ClientState {
+            subscriptions,
+            error: Default::default(),
+        });
+
         let (future, rx, tx) = PipeFuture::connect().await?;
 
-        spawn(async move {
-            if let Err(err) = future.await {
-                // TODO:
-                eprintln!("{err}")
+        // Spawn handler to run the pipe itself
+        spawn({
+            let state = state.clone();
+            async move {
+                if let Err(err) = future.await {
+                    // Store the client error
+                    *state.error.lock().await = Some(Arc::new(err));
+                }
+
+                // Drop any waiting channels
+                state.subscriptions.clear();
             }
         });
 
+        // Spawn handler to handle inbound messages
         spawn({
-            let subscriptions = subscriptions.clone();
+            let state = state.clone();
             let mut rx = rx;
 
             async move {
                 while let Some(frame) = rx.recv().await {
-                    subscriptions.invoke(frame.id, frame);
+                    state.subscriptions.invoke(frame.id, frame);
                 }
             }
         });
 
-        let handle = LHMClientHandle { subscriptions, tx };
+        let handle = LHMClientHandle { state, tx };
 
         Ok(handle)
     }
