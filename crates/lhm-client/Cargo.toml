@@ -1,6 +1,6 @@
 [package]
 name = "lhm-client"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 license = "MIT"
 authors = ["Jacobtread <jacobtread@gmail.com>"]
@@ -26,10 +26,10 @@ thiserror.workspace = true
 parking_lot.workspace = true
 
 # Shared structures
-lhm-shared = { version = "0.2.0", path = "../lhm-shared" }
+lhm-shared = { version = "0.3.0", path = "../lhm-shared" }
 
 # Windows service library
-windows-service = { version = "=0.8.0", optional = true }
+windows-service = { version = "0.8.0", optional = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros"] }

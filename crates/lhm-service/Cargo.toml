@@ -1,6 +1,6 @@
 [package]
 name = "lhm-service"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 license = "MIT"
 authors = ["Jacobtread <jacobtread@gmail.com>"]
@@ -10,13 +10,13 @@ description = "Windows service for running LHM and allowing clients to connect t
 
 [dependencies]
 # Error type
-anyhow = "=1.0.98"
+anyhow = "=1.0.102"
 
-# Async runtime 
+# Async runtime
 tokio = { workspace = true, features = ["rt", "sync"] }
 
 # Windows service library
-windows-service = "=0.8.0"
+windows-service = "=0.8.1"
 
 # Server to handle requests
-lhm-server = { version = "0.2.0", path = "../lhm-server" }
+lhm-server = { version = "0.3.0", path = "../lhm-server" }
