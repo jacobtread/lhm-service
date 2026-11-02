@@ -18,20 +18,6 @@ fn build_library() {
     let intermediate_path = out_path.join("lhm-bridge-build");
     let publish_path = out_path.join("lhm-bridge");
 
-    // Path to the nuget packages
-    let nuget_path = out_path.join(".nuget");
-
-    // Get the AOT SDK path
-    let sdk_path = nuget_path
-        .join("runtime.win-x64.microsoft.dotnet.ilcompiler")
-        .join("7.0.0")
-        .join("sdk");
-
-    // Change nuget packages path
-    unsafe {
-        env::set_var("NUGET_PACKAGES", nuget_path.clone());
-    }
-
     // Re-run build script if the bridge code changes
     println!(
         "cargo:rerun-if-changed={}",
@@ -62,10 +48,9 @@ fn build_library() {
         .arg(format!(
             "/p:BaseIntermediateOutputPath={}/",
             intermediate_path.display()
-        ));
-
-    // Build a shared .dll library
-    command.arg("/p:NativeLib=Shared");
+        ))
+        // Build a shared .dll library
+        .arg("/p:NativeLib=Shared");
 
     let status = command
         .status()
@@ -80,7 +65,6 @@ fn build_library() {
 
     // Setup linker paths
     println!("cargo:rustc-link-search=native={}", native_path.display());
-    println!("cargo:rustc-link-search=native={}", sdk_path.display());
 
     // Link to bridge library
     println!("cargo:rustc-link-lib=dylib=lhm-bridge");
