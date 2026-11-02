@@ -12,7 +12,7 @@
 //!
 
 use std::{
-    ffi::{CStr, c_void},
+    ffi::{c_void, CStr},
     marker::PhantomData,
 };
 
@@ -59,21 +59,8 @@ struct FfiResult<O: Copy, E: Copy> {
     data: FfiResultUnion<O, E>,
 }
 
-/// This is required for C# to properly initialize, this symbol just needs to
-/// make its way downstream into the final binary
-#[cfg(feature = "static")]
-#[used]
-static FORCE_INCLUDE: unsafe extern "C" fn() = static_initialization;
-
 #[link(name = "lhm-bridge")]
 unsafe extern "C" {
-
-    /// When statically linked we must ensure the NativeAOT_StaticInitialization symbol
-    /// is present on the compiled binary
-    #[cfg(feature = "static")]
-    #[link_name = "NativeAOT_StaticInitialization"]
-    pub fn static_initialization();
-
     unsafe fn free_string(ptr: Utf8Ptr);
     unsafe fn free_shared_array(ptr: SharedFfiArrayPtr);
     unsafe fn create_computer() -> FfiResult<ComputerPtr, Utf8Ptr>;
